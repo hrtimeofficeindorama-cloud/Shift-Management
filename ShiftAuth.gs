@@ -9,6 +9,7 @@ function loginShiftApp(identity, password) {
   identity = String(identity || "").trim();
   password = String(password || "");
   if (!identity || !password) throw new Error("Enter your employee ID/email and password.");
+  assertRateLimit_("LOGIN", identity, 10, 900);
   var emp = findEmployeeByIdentity_(identity);
   if (!emp) throw new Error("Invalid employee ID/email or password.");
   var stored = String(getEmpValue_(emp, ["Password", "Password Hash", "Login Password"]) || "");
@@ -16,6 +17,7 @@ function loginShiftApp(identity, password) {
     addAudit_(employeeId_(emp), "LOGIN_FAILED", [employeeId_(emp)], [], "", "", "Invalid login attempt", "Denied");
     throw new Error("Invalid employee ID/email or password. If you have not received a temporary password, contact HR.");
   }
+  clearRateLimit_("LOGIN", identity);
   var token = issueSession_(emp, authVersion_(employeeId_(emp)));
   addAudit_(employeeId_(emp), "LOGIN", [employeeId_(emp)], [], "", "", "Successful login", "Success");
   return {
@@ -62,6 +64,7 @@ function getRecoveryQuestion(identity) {
 }
 
 function resetPasswordWithSecret(identity, secretAnswer, newPassword) {
+  assertRateLimit_("RESET", identity, 5, 900);
   var emp = findEmployeeByIdentity_(String(identity || "").trim());
   if (!emp) throw new Error("Unable to reset this account. Verify the details or contact HR.");
   validatePassword_(newPassword);
@@ -71,6 +74,7 @@ function resetPasswordWithSecret(identity, secretAnswer, newPassword) {
     throw new Error("Unable to reset this account. Verify the recovery answer or contact HR.");
   }
   updateEmployeeFields_(emp, { "Password|Password Hash|Login Password": passwordHash_(newPassword, false) });
+  clearRateLimit_("RESET", identity);
   bumpAuthVersion_(employeeId_(emp));
   addAudit_(employeeId_(emp), "PASSWORD_RESET", [employeeId_(emp)], [], "", "", "Password reset using recovery question", "Success");
   return { success: true, message: "Password reset. You can now sign in." };
@@ -248,6 +252,21 @@ function constantTimeEquals_(a, b) {
   var length = Math.max(a.length, b.length);
   for (var i = 0; i < length; i++) mismatch |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return mismatch === 0;
+}
+
+function assertRateLimit_(kind, identity, maxAttempts, ttlSeconds) {
+  var cache = CacheService.getScriptCache();
+  var key = "SHIFT_RATE_" + kind + "_" + sha256Text_(norm_(identity));
+  var count = Number(cache.get(key) || 0);
+  if (count >= maxAttempts) {
+    throw new Error("Too many attempts. Please wait 15 minutes before trying again.");
+  }
+  cache.put(key, String(count + 1), ttlSeconds);
+}
+
+function clearRateLimit_(kind, identity) {
+  var key = "SHIFT_RATE_" + kind + "_" + sha256Text_(norm_(identity));
+  CacheService.getScriptCache().remove(key);
 }
 
 function normalizeAnswer_(answer) {
