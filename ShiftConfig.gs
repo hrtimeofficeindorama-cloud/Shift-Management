@@ -36,5 +36,7 @@ var SHIFT_APP_CONFIG = {
  */
 function setupShiftManagement() {
   ensureAllTables_();
+  // Running setup from the editor prompts for the email permission needed by notifications.
+  MailApp.getRemainingDailyQuota();
   return "Shift Management setup completed. Review Emp_List and assign at least one employee Role = HR.";
 }
