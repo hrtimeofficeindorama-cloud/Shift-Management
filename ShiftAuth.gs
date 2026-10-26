@@ -56,6 +56,7 @@ function setupInitialHrAccount(employeeId, bootstrapKey, temporaryPassword, secr
 }
 
 function getRecoveryQuestion(identity) {
+  assertRateLimit_("QUESTION", identity, 8, 900);
   var emp = findEmployeeByIdentity_(String(identity || "").trim());
   if (!emp) return { found: false, message: "Account was not found." };
   var question = String(getEmpValue_(emp, ["Secret Question", "Security Question", "Recovery Question"]) || "").trim();
