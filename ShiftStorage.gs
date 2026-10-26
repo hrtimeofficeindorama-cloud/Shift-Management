@@ -230,11 +230,13 @@ function canManageEmployee_(actor, target) {
 }
 
 function sameImmediateUplineGroup_(a, b) {
-  var aSic = norm_(getEmpValue_(a, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]));
-  var bSic = norm_(getEmpValue_(b, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]));
-  var aMgr = norm_(getEmpValue_(a, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]));
-  var bMgr = norm_(getEmpValue_(b, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]));
-  return (aSic && bSic && aSic === bSic) || (aMgr && bMgr && aMgr === bMgr);
+  var aSic = splitIds_(getEmpValue_(a, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"])).map(norm_);
+  var bSic = splitIds_(getEmpValue_(b, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"])).map(norm_);
+  var aMgr = splitIds_(getEmpValue_(a, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"])).map(norm_);
+  var bMgr = splitIds_(getEmpValue_(b, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"])).map(norm_);
+  var sameSic = aSic.some(function(id) { return id && bSic.indexOf(id) !== -1; });
+  var sameManager = aMgr.some(function(id) { return id && bMgr.indexOf(id) !== -1; });
+  return sameSic || sameManager;
 }
 
 function getAllowedSwapPartners_(actor, employees) {
