@@ -7,13 +7,11 @@ function getInitialData(token) {
   var employees = getEmployees_();
   var roles = getRoles_(actor);
   var team = hasRole_(actor, "HR") ? employees : getDownliners_(actor, employees);
-  var isTeamLead = hasRole_(actor, "SIC") || hasRole_(actor, "L1 Manager");
   var canSchedule = hasRole_(actor, "HR") || hasRole_(actor, "SIC");
-  if (!isTeamLead && !hasRole_(actor, "HR")) team = [];
   return {
     employee: publicEmployee_(actor), roles: roles,
     isHr: hasRole_(actor, "HR"), canSchedule: canSchedule,
-    canViewTeam: isTeamLead || hasRole_(actor, "HR"),
+    canViewTeam: team.length > 0 || hasRole_(actor, "HR"),
     canBulkImport: hasRole_(actor, "HR"),
     patterns: Object.keys(SHIFT_APP_CONFIG.PATTERNS).map(function(name) {
       return { name: name, sequence: SHIFT_APP_CONFIG.PATTERNS[name] };
@@ -33,8 +31,9 @@ function getRosterData(token, fromDate, toDate) {
   var employees = getEmployees_();
   var actor = ctx.employee;
   var allowed;
+  var directReports = getDownliners_(actor, employees);
   if (hasRole_(actor, "HR")) allowed = employees;
-  else if (hasRole_(actor, "SIC") || hasRole_(actor, "L1 Manager")) allowed = [actor].concat(getDownliners_(actor, employees));
+  else if (hasRole_(actor, "SIC") || hasRole_(actor, "L1 Manager") || directReports.length) allowed = [actor].concat(directReports);
   else allowed = [actor];
   return createRosterGrid_(allowed, dates[0], dates[dates.length - 1]);
 }
