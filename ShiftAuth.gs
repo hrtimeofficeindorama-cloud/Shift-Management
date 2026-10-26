@@ -11,7 +11,7 @@ function loginShiftApp(identity, password) {
   if (!identity || !password) throw new Error("Enter your employee ID/email and password.");
   assertRateLimit_("LOGIN", identity, 10, 900);
   var emp = findEmployeeByIdentity_(identity);
-  if (!emp) throw new Error("Invalid employee ID/email or password.");
+  if (!emp) throw new Error("Invalid employee ID/email or password. If you have not received a temporary password, contact HR.");
   var stored = String(getEmpValue_(emp, ["Password", "Password Hash", "Login Password"]) || "");
   if (!stored || !verifyPassword_(password, stored)) {
     addAudit_(employeeId_(emp), "LOGIN_FAILED", [employeeId_(emp)], [], "", "", "Invalid login attempt", "Denied");
@@ -101,7 +101,8 @@ function changeMyPassword(token, currentPassword, newPassword, secretQuestion, s
 }
 
 function saveAccountSecurity(token, currentPassword, secretQuestion, secretAnswer) {
-  var ctx = requireFullSession_(token);
+  var ctx = getAuthContext_(token);
+  if (ctx.mustChangePassword) throw new Error("Change your temporary password and set recovery details first.");
   var stored = String(getEmpValue_(ctx.employee, ["Password", "Password Hash", "Login Password"]) || "");
   if (!verifyPassword_(String(currentPassword || ""), stored)) throw new Error("Current password is incorrect.");
   validateRecovery_(secretQuestion, secretAnswer);
@@ -179,12 +180,20 @@ function getAuthContext_(token) {
     throw new Error("Employee account no longer exists.");
   }
   var stored = String(getEmpValue_(emp, ["Password", "Password Hash", "Login Password"]) || "");
-  return { employee: emp, empId: employeeId_(emp), mustChangePassword: stored.indexOf("TEMPv1$") === 0, token: token };
+  var question = String(getEmpValue_(emp, ["Secret Question", "Security Question", "Recovery Question"]) || "").trim();
+  var answerHash = String(getEmpValue_(emp, ["Secret Answer Hash"]) || "").trim();
+  return {
+    employee: emp, empId: employeeId_(emp),
+    mustChangePassword: stored.indexOf("TEMPv1$") === 0,
+    needsRecoverySetup: !question || !answerHash,
+    token: token
+  };
 }
 
 function requireFullSession_(token) {
   var ctx = getAuthContext_(token);
   if (ctx.mustChangePassword) throw new Error("Change your temporary password before using the application.");
+  if (ctx.needsRecoverySetup) throw new Error("Set up your account recovery question before using the application.");
   return ctx;
 }
 
