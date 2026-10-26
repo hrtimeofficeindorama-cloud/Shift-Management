@@ -187,6 +187,10 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
       "Comments": appendComment_(rec.Comments, approverType + " approved by " + ctx.empId + ": " + (comment || ""))
     });
     rec[field] = JSON.stringify(dec);
+    addAudit_(ctx.empId, "SHIFT_SWAP_APPROVAL_RECORDED", [requesterId, partnerId],
+      [normalizeSheetDate_(rec["Shift Date"])], "", "",
+      { requestId: requestId, approverType: approverType, decision: "Approved", comment: comment || "" },
+      "Approval recorded");
     var allSicApproved = allApproved_(splitIds_(rec["SIC Approver IDs"]), parseJsonObject_(rec["SIC Decisions JSON"]));
     var allMgrApproved = allApproved_(splitIds_(rec["Manager Approver IDs"]), parseJsonObject_(rec["Manager Decisions JSON"]));
     if (allSicApproved && allMgrApproved) {
