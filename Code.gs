@@ -1,436 +1,188 @@
-/** SERVE THE WEB APP — plain Index.html only (no base64 loader) */
-function doGet(e) {
-  return HtmlService.createTemplateFromFile('Index')
-      .evaluate()
-      .setTitle('Leave Management Portal')
-      .setFaviconUrl('https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
+function syncEmployeeRecords() {
+  const FOLDER_ID = "1DZ2MYPvTR1HMSVUIE3fcCIBVLyrBqxD1";
+  const SPREADSHEET_ID = "1Mzh0H6PQTq6w47fIlMJ6qUL9UT3NvpBvuoBRN_DrSA8";
+  const SHEET_NAME = "Emp_List";
 
-function loginUser(userId, password) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var userSheet = ss.getSheetByName('userData');
-  if (!userSheet) return { success: false, message: "System Error: userData sheet missing." };
-  var data = userSheet.getDataRange().getValues();
-  var searchId = String(userId).trim().toLowerCase();
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === searchId && String(data[i][1]).trim() === String(password)) {
-      var dbName = String(data[i][2]).trim();
-      return { success: true, user: { id: String(data[i][0]).trim(), name: dbName, role: dbName.toLowerCase() === 'olusegun kehinde' ? 'admin' : 'standard' } };
-    }
-  }
-  return { success: false, message: "Invalid User ID or Password." };
-}
+  // Core mapped headers
+  const coreHeaders = [
+    "Emp ID",
+    "Emp Name",
+    "Category",
+    "Class",
+    "Phone Number",
+    "Official Email",
+    "Personal Email",
+    "Business Unit",
+    "Function",
+    "Department"
+  ];
 
-function getSecurityQuestion(userId) {
-  var data = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('userData').getDataRange().getValues();
-  var searchId = String(userId).trim().toLowerCase();
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === searchId) {
-      var q = String(data[i][3] || '').trim();
-      if (!q) return { success: false, message: "No security question set. Contact Mr. Olusegun Kehinde." };
-      return { success: true, question: q, userId: String(data[i][0]).trim() };
-    }
-  }
-  return { success: false, message: "User ID not found." };
-}
+  // Files processing order
+  const fileNames = [
+    "Employee List for Leave.csv",
+    "Employee_National_Master.csv",
+    "Employee_Expat_Master.csv"
+  ];
 
-function resetPasswordWithAnswer(userId, answer) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('userData');
-  var data = sheet.getDataRange().getValues();
-  var searchId = String(userId).trim().toLowerCase();
-  var supplied = String(answer || '').trim().toLowerCase();
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === searchId) {
-      if (String(data[i][4] || '').trim().toLowerCase() !== supplied)
-        return { success: false, message: "Incorrect answer. Password was not changed." };
-      var newPass = String(data[i][0]).trim().toLowerCase();
-      sheet.getRange(i + 1, 2).setValue(newPass);
-      return { success: true, message: "Password reset to lowercase User ID: " + newPass };
-    }
-  }
-  return { success: false, message: "User ID not found." };
-}
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  
+  // 1. Capture existing sheet data (preserves SIC, Manager, Role, Password, Secret Question, etc.)
+  const existingDataMap = {};
+  let existingExtraHeaders = [];
 
-function getHeaderIndex_(headers, names) {
-  for (var i = 0; i < names.length; i++) {
-    var idx = headers.indexOf(names[i]);
-    if (idx !== -1) return idx;
-  }
-  return -1;
-}
-
-function getEmployeeForForm(empId) {
-  var search = String(empId).trim().toUpperCase();
-  var empMap = loadEmployeeMapCached_();
-  var emp = empMap[search];
-  if (!emp) {
-    var partials = [];
-    Object.keys(empMap).forEach(function(id) {
-      if (id === '_headers') return;
-      if (id.indexOf(search) !== -1) partials.push(id);
-    });
-    if (partials.length === 1) emp = empMap[partials[0]];
-    else if (partials.length > 1) return { error: "Multiple employees match. Select from suggestions." };
-    else return { error: "Employee ID not found." };
-  }
-
-  var empData = {
-    id: String(emp['Emp ID'] || search).trim().toUpperCase(),
-    name: String(emp['Emp Name'] || '').trim(),
-    dept: String(emp['Department'] || '').trim(),
-    category: String(emp['Category'] || '').trim(),
-    bu: String(emp['Business Unit'] || '').trim()
-  };
-
-  var balancePayload = apiGetEmployeeBalance(empData.id);
-  if (balancePayload.error) return balancePayload;
-
-  var balances = [];
-  Object.keys(balancePayload.balances || {}).forEach(function(type) {
-    var d = (balancePayload.detail && balancePayload.detail[type]) ? balancePayload.detail[type] : {};
-    balances.push({
-      type: type,
-      entitlement: balancePayload.entitlements[type],
-      utilized: balancePayload.usage[type] || 0,
-      balance: balancePayload.balances[type],
-      detail: d,
-      show: d.show !== false
-    });
-  });
-
-  return {
-    profile: empData,
-    balances: balances,
-    entitledTypes: balancePayload.entitledTypes || Object.keys(balancePayload.balances || {})
-  };
-}
-
-function searchEmployees(query, limit) {
-  var empMap = loadEmployeeMapCached_();
-  var needle = String(query || '').trim().toLowerCase();
-  var max = Number(limit) || 10;
-  var matches = [];
-  Object.keys(empMap).forEach(function(id) {
-    if (id === '_headers' || matches.length >= max) return;
-    if (id.toLowerCase().indexOf(needle) !== -1) {
-      var e = empMap[id];
-      matches.push({ id: id, name: String(e['Emp Name'] || ''), department: String(e['Department'] || '') });
-    }
-  });
-  return matches;
-}
-
-function submitLeaveRequest(formData, userSession) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tblLeave = ss.getSheetByName('tblLeave');
-  if (!tblLeave) return { success: false, message: "tblLeave missing." };
-
-  var leaveData = tblLeave.getDataRange().getValues();
-  var headers = leaveData[0].map(function(h) { return String(h).trim(); });
-
-  var nameParts = String(userSession.name).trim().split(/\s+/);
-  var initials = nameParts.length >= 2
-    ? (nameParts[0].charAt(0) + nameParts[1].charAt(0)).toUpperCase()
-    : (nameParts[0] ? nameParts[0].substring(0, 2).toUpperCase() : 'XX');
-
-  var entryCodeIdx = headers.indexOf('Entry Code');
-  var maxSerial = 0;
-  for (var i = 1; i < leaveData.length; i++) {
-    var m = String(leaveData[i][entryCodeIdx]).trim().match(/^[A-Z]+-(\d+)$/);
-    if (m) { var n = parseInt(m[1], 10); if (n > maxSerial) maxSerial = n; }
-  }
-  var newEntryCode = initials + '-' + (maxSerial === 0 ? 1000 : maxSerial + 1);
-
-  var sysLeaveCode = '';
-  var policies = loadPoliciesCached_();
-  for (var p = 0; p < policies.length; p++) {
-    if (String(policies[p]['Leave Type'] || '').trim() === formData.leaveType) {
-      sysLeaveCode = String(policies[p]['DB Leave Code'] || '').trim();
-      break;
+  if (sheet && sheet.getLastRow() > 1) {
+    const existingRange = sheet.getDataRange().getValues();
+    const existingHeaders = existingRange[0].map(h => h.toString().trim());
+    
+    // Identify any columns beyond our core mapped headers
+    existingExtraHeaders = existingHeaders.filter(h => !coreHeaders.includes(h));
+    
+    const empIdColIdx = existingHeaders.indexOf("Emp ID");
+    if (empIdColIdx !== -1) {
+      for (let i = 1; i < existingRange.length; i++) {
+        const row = existingRange[i];
+        const empId = row[empIdColIdx] ? row[empIdColIdx].toString().trim() : "";
+        if (empId) {
+          const rowData = {};
+          existingHeaders.forEach((header, idx) => {
+            rowData[header] = row[idx];
+          });
+          existingDataMap[empId] = rowData;
+        }
+      }
     }
   }
 
-  var sDate = parseDateOnly_(formData.startDate);
-  var eDate = parseDateOnly_(formData.endDate);
-  if (!sDate || !eDate) {
-    return { success: false, message: 'Invalid start or end date.' };
-  }
-  var noOfDays = Math.round((eDate - sDate) / 86400000) + 1;
-  var utilized = 0;
-  try { utilized = calculateLeaveUtilize(formData.empId, sDate, eDate, formData.leaveType); }
-  catch (e) { utilized = noOfDays; }
+  // 2. Fetch and parse CSV files from Drive folder
+  const folder = DriveApp.getFolderById(FOLDER_ID);
+  const seenEmpIds = new Set();
+  const outputRows = [];
 
-  if (formData.availableBalance !== 'Unlimited' && utilized > Number(formData.availableBalance)) {
-    return { success: false, message: 'Rejected: required days (' + utilized + ') exceed available balance.' };
-  }
+  fileNames.forEach(fileName => {
+    const files = folder.getFilesByName(fileName);
+    if (!files.hasNext()) {
+      Logger.log("File not found: " + fileName);
+      return;
+    }
 
-  var rowObj = {
-    'Entry Code': newEntryCode, 'Leave Code': sysLeaveCode, 'Emp ID': formData.empId,
-    'Emp Name': formData.empName, 'Department': formData.dept, 'Category': formData.category,
-    'Leave Type': formData.leaveType, 'Start Date': sDate, 'End Date': eDate,
-    'Leave Reason': formData.leaveReason, 'No of Days': noOfDays, 'Leave Utilized': utilized,
-    'Entitlement Year': sDate.getFullYear(), 'Date Entered': new Date(), 'Entered By': userSession.name,
-    'Date Modified': '', 'Modified By': '', 'BU': formData.bu, 'DB Remark': 'Not Uploaded',
-    'Upload Date': '', 'Uploaded By': ''
-  };
-  tblLeave.appendRow(headers.map(function(h) { return rowObj[h] !== undefined ? rowObj[h] : ''; }));
+    const file = files.next();
+    const csvContent = file.getBlob().getDataAsString();
+    const csvData = Utilities.parseCsv(csvContent);
 
-  try {
-    var last = tblLeave.getLastRow();
-    var si = headers.indexOf('Start Date');
-    var ei = headers.indexOf('End Date');
-    if (si >= 0) tblLeave.getRange(last, si + 1).setNumberFormat('dd-mmm-yyyy');
-    if (ei >= 0) tblLeave.getRange(last, ei + 1).setNumberFormat('dd-mmm-yyyy');
-  } catch (fe) {}
+    if (csvData.length < 2) return;
 
-  invalidateEmpCaches_(formData.empId);
-  return { success: true, message: 'Leave recorded as ' + newEntryCode + ' (utilized ' + utilized + ' days)' };
-}
-
-function getEmployeeLeaveHistory(empId) {
-  var rows = loadLeaveRowsForEmp_(empId);
-  var history = rows.map(function(r) {
-    return {
-      entryCode: r['Entry Code'],
-      empId: r['Emp ID'],
-      empName: r['Emp Name'],
-      type: r['Leave Type'],
-      startDate: formatDateOnly_(r['Start Date']),
-      endDate: formatDateOnly_(r['End Date']),
-      noOfDays: r['No of Days'],
-      entitlementYear: r['Entitlement Year'],
-      utilized: r['Leave Utilized'],
-      reason: r['Leave Reason'],
-      status: r['DB Remark']
+    const headerRow = csvData[0].map(h => h.toString().trim());
+    
+    // Helper to find column index supporting both normal names and "Emp List[...]" wrappers
+    const getColIdx = (possibleNames) => {
+      if (!Array.isArray(possibleNames)) possibleNames = [possibleNames];
+      for (let name of possibleNames) {
+        let idx = headerRow.findIndex(h => h.toLowerCase() === name.toLowerCase());
+        if (idx !== -1) return idx;
+        idx = headerRow.findIndex(h => h.toLowerCase() === `emp list[${name.toLowerCase()}]`);
+        if (idx !== -1) return idx;
+      }
+      return -1;
     };
-  });
-  history.sort(function(a, b) {
-    return String(b.startDate || '').localeCompare(String(a.startDate || ''));
-  });
-  return history;
-}
 
-function updateLeaveRecord(updateData, userSession) {
-  var tblLeave = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('tblLeave');
-  var data = tblLeave.getDataRange().getValues();
-  var headers = data[0].map(function(h) { return String(h).trim(); });
-  var entryCodeIdx = headers.indexOf('Entry Code');
-  var target = -1;
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][entryCodeIdx]).trim() === updateData.entryCode) { target = i + 1; break; }
-  }
-  if (target < 0) return { success: false, message: 'Record not found.' };
+    for (let i = 1; i < csvData.length; i++) {
+      const row = csvData[i];
+      let empId = "", empName = "", category = "", classVal = "";
+      let phoneNumber = "", officialEmail = "", personalEmail = "";
+      let businessUnit = "", functionVal = "", department = "";
 
-  var sDate = parseDateOnly_(updateData.startDate);
-  var eDate = parseDateOnly_(updateData.endDate);
-  if (!sDate || !eDate) return { success: false, message: 'Invalid dates.' };
+      if (fileName === "Employee List for Leave.csv") {
+        empId = getValue(row, getColIdx(["Emp ID"]));
+        empName = getValue(row, getColIdx(["Emp Name"]));
+        category = "Trainee";
+        classVal = "National";
+        phoneNumber = "";
+        officialEmail = getValue(row, getColIdx(["Phone Number"]));
+        personalEmail = getValue(row, getColIdx(["Email"]));
+        businessUnit = getValue(row, getColIdx(["Business Unit"]));
+        functionVal = "";
+        department = getValue(row, getColIdx(["Department"]));
 
-  var noOfDays = Math.round((eDate - sDate) / 86400000) + 1;
-  var type = String(data[target - 1][headers.indexOf('Leave Type')] || '');
-  var utilized = 0;
-  try { utilized = calculateLeaveUtilize(updateData.empId, sDate, eDate, type); }
-  catch (e) { utilized = noOfDays; }
+      } else {
+        empId = getValue(row, getColIdx(["Emp ID"]));
+        empName = getValue(row, getColIdx(["Full Name"]));
+        category = getValue(row, getColIdx(["Designation"]));
+        classVal = fileName === "Employee_National_Master.csv" ? "National" : "Expat";
+        phoneNumber = getValue(row, getColIdx(["Personal Mobile Number"]));
+        officialEmail = getValue(row, getColIdx(["Official Email Id"]));
+        personalEmail = getValue(row, getColIdx(["Personal Email Id"]));
+        businessUnit = getValue(row, getColIdx(["Group Company Code"]));
+        functionVal = getValue(row, getColIdx(["Departments Hierarchy_1_Name"]));
+        department = getValue(row, getColIdx(["Departments Hierarchy_2_Name"]));
 
-  [{ col: 'Start Date', val: sDate }, { col: 'End Date', val: eDate }, { col: 'Leave Reason', val: updateData.leaveReason },
-   { col: 'No of Days', val: noOfDays }, { col: 'Leave Utilized', val: utilized },
-   { col: 'Date Modified', val: new Date() }, { col: 'Modified By', val: userSession.name }
-  ].forEach(function(u) {
-    var c = headers.indexOf(u.col);
-    if (c > -1) {
-      var cell = tblLeave.getRange(target, c + 1);
-      cell.setValue(u.val);
-      if (u.col === 'Start Date' || u.col === 'End Date') {
-        try { cell.setNumberFormat('dd-mmm-yyyy'); } catch (fe) {}
+      }
+
+      if (!empId) continue;
+
+      // Apply Business Unit transformations
+      if (businessUnit === "IFL") {
+        businessUnit = "IFZ";
+      } else if (businessUnit === "OIP") {
+        businessUnit = "OIS";
+      }
+
+      // Deduplication check: Retain first occurrence, discard duplicates
+      if (!seenEmpIds.has(empId)) {
+        seenEmpIds.add(empId);
+        
+        // Build base record object
+        const rowObj = {
+          "Emp ID": empId,
+          "Emp Name": empName,
+          "Category": category,
+          "Class": classVal,
+          "Phone Number": phoneNumber,
+          "Official Email": officialEmail,
+          "Personal Email": personalEmail,
+          "Business Unit": businessUnit,
+          "Function": functionVal,
+          "Department": department
+
+        };
+
+        // Attach existing extra columns (SIC, Manager, Role, Password, secret question, etc.) if matched by Emp ID
+        if (existingDataMap[empId]) {
+          existingExtraHeaders.forEach(eh => {
+            rowObj[eh] = existingDataMap[empId][eh] !== undefined ? existingDataMap[empId][eh] : "";
+          });
+        } else {
+          existingExtraHeaders.forEach(eh => {
+            rowObj[eh] = "";
+          });
+        }
+
+        outputRows.push(rowObj);
       }
     }
   });
-  invalidateEmpCaches_(updateData.empId);
-  return { success: true, message: 'Record ' + updateData.entryCode + ' updated.' };
-}
 
-function buildBalanceReportCsv(buFilter, deptFilter) {
-  return arrayToCsv_(generateReportArray(buFilter || null, deptFilter || null));
-}
-
-function getLeaveRecordsFiltered(filters) {
-  filters = filters || {};
-  var fromD = filters.fromDate ? parseDateOnly_(filters.fromDate) : null;
-  var toD = filters.toDate ? parseDateOnly_(filters.toDate) : null;
-  if (fromD && toD && typeof getLeaveRecordsInRange_ === 'function') {
-    var ranged = getLeaveRecordsInRange_(fromD, toD);
-    var rows = ranged.rows || [];
-    return { rows: rows.map(function(r) {
-      return {
-        entryCode: r.entryCode, empId: r.empId, empName: r.empName, department: r.department,
-        bu: '', leaveType: r.leaveType,
-        startDate: formatDateOnly_(r.startDate),
-        endDate: formatDateOnly_(r.endDate),
-        utilized: r.leaveUtilized, dbRemark: '', enteredBy: r.enteredBy,
-        dateEntered: r.dateEntered
-      };
-    }), total: rows.length };
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
   }
-  var data = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('tblLeave').getDataRange().getValues();
-  var headers = data.shift().map(function(h) { return String(h).trim(); });
-  var idx = {
-    entry: headers.indexOf('Entry Code'), emp: headers.indexOf('Emp ID'), name: headers.indexOf('Emp Name'),
-    dept: headers.indexOf('Department'), bu: headers.indexOf('BU'), type: headers.indexOf('Leave Type'),
-    start: headers.indexOf('Start Date'), end: headers.indexOf('End Date'), util: headers.indexOf('Leave Utilized'),
-    remark: headers.indexOf('DB Remark'), enteredBy: headers.indexOf('Entered By')
-  };
-  var limit = Number(filters.limit) || 500;
-  var rows = [];
-  for (var i = 0; i < data.length && rows.length < limit; i++) {
-    var r = data[i];
-    var empId = String(r[idx.emp] || '').trim().toUpperCase();
-    if (filters.empId && empId.indexOf(String(filters.empId).toUpperCase()) === -1) continue;
-    if (filters.bu && String(r[idx.bu]).toUpperCase() !== String(filters.bu).toUpperCase()) continue;
-    if (filters.dept && String(r[idx.dept]).toUpperCase() !== String(filters.dept).toUpperCase()) continue;
-    if (filters.leaveType && String(r[idx.type]).trim() !== String(filters.leaveType).trim()) continue;
-    if (filters.dbRemark && String(r[idx.remark]).toLowerCase().indexOf(String(filters.dbRemark).toLowerCase()) === -1) continue;
-    var sDate = idx.start >= 0 ? parseDateOnly_(r[idx.start]) : null;
-    var eDate = idx.end >= 0 ? parseDateOnly_(r[idx.end]) : null;
-    if (fromD && eDate && eDate < fromD) continue;
-    if (toD && sDate && sDate > toD) continue;
-    rows.push({
-      entryCode: r[idx.entry], empId: empId, empName: r[idx.name], department: r[idx.dept], bu: r[idx.bu],
-      leaveType: r[idx.type],
-      startDate: formatDateOnly_(sDate || r[idx.start]),
-      endDate: formatDateOnly_(eDate || r[idx.end]),
-      utilized: r[idx.util],
-      dbRemark: r[idx.remark], enteredBy: r[idx.enteredBy]
-    });
-  }
-  return { rows: rows, total: rows.length };
-}
 
-function buildLeaveRecordsCsv(filters) {
-  var result = getLeaveRecordsFiltered(filters || {});
-  var out = [['Entry Code', 'Emp ID', 'Emp Name', 'Department', 'BU', 'Leave Type', 'Start Date', 'End Date', 'Leave Utilized', 'DB Remark', 'Entered By']];
-  result.rows.forEach(function(r) {
-    out.push([r.entryCode, r.empId, r.empName, r.department, r.bu, r.leaveType,
-      formatDateOnly_(r.startDate), formatDateOnly_(r.endDate),
-      r.utilized, r.dbRemark, r.enteredBy]);
-  });
-  return arrayToCsv_(out);
-}
+  // 3. Combine core headers and preserved extra columns
+  const finalHeaders = [...coreHeaders, ...existingExtraHeaders];
+  const finalDataMatrix = [finalHeaders];
 
-function getShiftCalendar(empId, year, month) {
-  year = Number(year) || new Date().getFullYear();
-  month = Number(month) || (new Date().getMonth() + 1);
-  var target = String(empId).trim().toUpperCase();
-  var shiftMap = loadShiftMapForEmp_(target);
-  var leaveRows = loadLeaveRowsForEmp_(target);
-
-  var leaveByDate = {};
-  leaveRows.forEach(function(r) {
-    var s = parseDateOnly_(r['Start Date']);
-    var e = parseDateOnly_(r['End Date']);
-    if (!s || !e) return;
-    var cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-    var end = new Date(e.getFullYear(), e.getMonth(), e.getDate());
-    while (cur <= end) {
-      if (cur.getFullYear() === year && (cur.getMonth() + 1) === month) {
-        var k = formatDateKey(cur);
-        if (!leaveByDate[k]) leaveByDate[k] = [];
-        leaveByDate[k].push(String(r['Leave Type'] || 'Leave'));
-      }
-      cur.setDate(cur.getDate() + 1);
-    }
+  outputRows.forEach(rowObj => {
+    const rowArray = finalHeaders.map(h => rowObj[h] !== undefined ? rowObj[h] : "");
+    finalDataMatrix.push(rowArray);
   });
 
-  var daysInMonth = new Date(year, month, 0).getDate();
-  var days = [];
-  for (var day = 1; day <= daysInMonth; day++) {
-    var dt = new Date(year, month - 1, day);
-    var key = dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
-    days.push({
-      date: key,
-      day: day,
-      dayOfWeek: dt.getDay(),
-      shift: shiftMap[key] || '',
-      leaves: leaveByDate[key] || []
-    });
+  // 4. Clear and perform single batch write
+  sheet.clearContents();
+  if (finalDataMatrix.length > 0) {
+    sheet.getRange(1, 1, finalDataMatrix.length, finalHeaders.length).setValues(finalDataMatrix);
   }
-  return { year: year, month: month, empId: target, days: days };
 }
 
-function updateShiftCode(empId, dateStr, shiftCode, userSession) {
-  var shiftSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('tblShift');
-  if (!shiftSheet) return { success: false, message: 'tblShift not found.' };
-
-  var data = shiftSheet.getDataRange().getValues();
-  if (data.length < 1) return { success: false, message: 'tblShift empty.' };
-
-  var target = String(empId).trim().toUpperCase();
-  var d = parseDateOnly_(dateStr) || new Date(dateStr);
-  var targetKey = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-  var code = String(shiftCode || '').trim().toUpperCase();
-
-  var h1 = String(data[0][1] || '').trim();
-  var isWide = /^\d{4}-\d{2}-\d{2}/.test(h1) ||
-    (String(data[0][0] || '').toLowerCase().indexOf('emp') === 0 && h1.toLowerCase() !== 'date');
-
-  if (isWide) {
-    var col = -1;
-    for (var c = 1; c < data[0].length; c++) {
-      var hs = String(data[0][c] || '').trim().substring(0, 10);
-      if (hs === targetKey) { col = c + 1; break; }
-    }
-    var row = -1;
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0] || '').trim().toUpperCase() === target) { row = i + 1; break; }
-    }
-
-    if (col < 0 && code) {
-      col = data[0].length + 1;
-      if (col > shiftSheet.getMaxColumns()) shiftSheet.insertColumnsAfter(shiftSheet.getMaxColumns(), 1);
-      shiftSheet.getRange(1, col).setValue(targetKey);
-    }
-    if (row < 0 && code) {
-      row = data.length + 1;
-      shiftSheet.getRange(row, 1).setValue(target);
-    }
-    if (row > 0 && col > 0) {
-      shiftSheet.getRange(row, col).setValue(code || '');
-      invalidateEmpCaches_(target);
-      return { success: true, message: code ? ('Shift updated to ' + code) : 'Shift cleared' };
-    }
-    return { success: true, message: 'Nothing to update' };
-  }
-
-  var found = -1;
-  for (var j = 1; j < data.length; j++) {
-    if (String(data[j][0]).trim().toUpperCase() !== target) continue;
-    var dd = data[j][1];
-    var ks;
-    if (dd instanceof Date) {
-      ks = dd.getFullYear() + '-' + ('0' + (dd.getMonth() + 1)).slice(-2) + '-' + ('0' + dd.getDate()).slice(-2);
-    } else {
-      ks = String(dd || '').trim().substring(0, 10);
-    }
-    if (ks === targetKey) { found = j + 1; break; }
-  }
-  if (found > -1) {
-    if (!code) { shiftSheet.deleteRow(found); invalidateEmpCaches_(target); return { success: true, message: 'Shift cleared' }; }
-    shiftSheet.getRange(found, 3).setValue(code);
-    invalidateEmpCaches_(target);
-    return { success: true, message: 'Shift updated to ' + code };
-  }
-  if (!code) return { success: true, message: 'Nothing to clear' };
-  shiftSheet.appendRow([target, targetKey, code]);
-  invalidateEmpCaches_(target);
-  return { success: true, message: 'Shift added: ' + code };
-}
-
-function arrayToCsv_(rows) {
-  return rows.map(function(row) {
-    return row.map(function(cell) {
-      var cellStr = String(cell == null ? '' : cell);
-      if (/[",\n]/.test(cellStr)) return '"' + cellStr.replace(/"/g, '""') + '"';
-      return cellStr;
-    }).join(',');
-  }).join('\n');
+function getValue(row, index) {
+  if (index === -1 || index >= row.length) return "";
+  return row[index] ? row[index].toString().trim() : "";
 }
