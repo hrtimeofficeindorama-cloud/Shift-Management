@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    :root{--navy:#102a43;--blue:#176b87;--teal:#1d8a86;--gold:#e7b75c;--ink:#243b53;--muted:#627d98;--line:#d9e2ec;--paper:#f4f7fb;--white:#fff;--red:#b83232;--green:#237a57}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--ink);background:var(--paper);font-size:14px}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:var(--blue);color:#fff;font-weight:600}
+    button:hover{filter:brightness(.94)}button.secondary{background:#e6eef5;color:var(--navy);border:1px solid #d3e0eb}button.danger{background:var(--red)}button.success{background:var(--green)}button:disabled{opacity:.5;cursor:not-allowed}
+    input,select,textarea{width:100%;border:1px solid #c8d5e2;border-radius:8px;padding:10px 11px;background:#fff;color:var(--ink);outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px #1d8a8620}
+    label{display:block;font-weight:650;font-size:12px;color:#486581;margin:0 0 6px}
+    textarea{min-height:90px;resize:vertical}
+    h1,h2,h3,p{margin-top:0}h1{font-size:24px;letter-spacing:-.5px;color:var(--navy);margin-bottom:6px}h2{font-size:18px;color:var(--navy);margin-bottom:8px}h3{font-size:14px;color:var(--navy);margin-bottom:7px}
+    .muted{color:var(--muted)}.small{font-size:12px}.hidden{display:none!important}
+    .auth-wrap{min-height:100vh;display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,480px);background:#fff}
+    .brand-pane{padding:58px clamp(24px,7vw,90px);background:linear-gradient(145deg,#102a43,#176b87);color:#fff;display:flex;flex-direction:column;justify-content:space-between}
+    .brand-mark{width:44px;height:44px;display:grid;place-items:center;background:#ffffff20;border:1px solid #ffffff30;border-radius:13px;font-size:22px;font-weight:800}
+    .brand-pane h1{color:#fff;font-size:38px;line-height:1.12;margin-top:42px;max-width:440px}
+    .brand-pane p{color:#d7e9f3;max-width:450px;line-height:1.7;font-size:15px}
+    .brand-foot{color:#b4d1df;font-size:12px;line-height:1.7}
+    .auth-card-wrap{display:flex;align-items:center;justify-content:center;padding:34px 26px;background:#f7fafc}
+    .auth-card{width:100%;max-width:375px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 44px #102a4310;padding:28px}
+    .auth-card .field{margin:18px 0}.auth-card button{width:100%;margin-top:6px}
+    .auth-switch{font-size:12px;text-align:center;margin-top:18px}
+    .shell{min-height:100vh}
+    .topbar{background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:16px clamp(16px,3vw,40px);gap:20px}
+    .logo{display:flex;align-items:center;gap:12px}.logo-icon{width:36px;height:36px;background:var(--teal);border-radius:10px;display:grid;place-items:center;font-weight:800}
+    .logo-title{font-weight:750;font-size:16px;letter-spacing:.1px}.logo-sub{font-size:11px;color:#b8d1df;margin-top:2px}
+    .profile{display:flex;align-items:center;gap:12px}.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#dbeafe;color:var(--navy);font-weight:800}.profile-name{font-weight:650}.profile-role{font-size:11px;color:#b8d1df;margin-top:3px}
+    .app-layout{display:grid;grid-template-columns:224px minmax(0,1fr);max-width:1800px;margin:0 auto;min-height:calc(100vh - 68px)}
+    .sidebar{padding:24px 14px;background:#fff;border-right:1px solid var(--line)}
+    .nav-label{color:#829ab1;font-size:10px;letter-spacing:1.3px;font-weight:800;padding:4px 12px 12px}
+    .nav-btn{display:flex;width:100%;align-items:center;gap:11px;background:transparent;color:#486581;text-align:left;margin:3px 0;padding:11px 12px;border-radius:8px;font-weight:650}
+    .nav-btn .nav-icon{width:18px;text-align:center;color:var(--teal);font-size:16px}.nav-btn.active{background:#e5f4f4;color:#0b5b63}.nav-btn:hover{filter:none;background:#f0f5f9}
+    .side-bottom{margin:38px 9px 0;padding-top:16px;border-top:1px solid var(--line);font-size:11px;color:#829ab1;line-height:1.65}
+    .main{padding:30px clamp(16px,3vw,42px) 55px;min-width:0}
+    .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}.page-head p{color:var(--muted);margin:6px 0 0}
+    .date-chip{border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 12px;color:#486581;font-size:12px;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}.col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-7{grid-column:span 7}.col-6{grid-column:span 6}.col-5{grid-column:span 5}.col-4{grid-column:span 4}
+    .card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:20px;min-width:0;box-shadow:0 3px 10px #102a4305}
+    .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}.card-head p{font-size:12px;color:var(--muted);margin:5px 0 0}
+    .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:17px}
+    .metric{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px}.metric-label{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}.metric-value{font-size:25px;font-weight:800;color:var(--navy);margin:10px 0 4px}.metric-note{font-size:11px;color:var(--muted)}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.field.full{grid-column:1/-1}.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:16px}.help{font-size:11px;line-height:1.55;color:var(--muted);margin-top:6px}.rule{height:1px;background:#edf2f7;margin:17px 0}
+    .table-wrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:9px}table{width:100%;border-collapse:collapse;white-space:nowrap;background:#fff;font-size:12px}th{background:#f0f5f9;text-align:left;color:#486581;font-size:10px;letter-spacing:.45px;text-transform:uppercase;padding:11px 12px;border-bottom:1px solid var(--line)}td{padding:11px 12px;border-bottom:1px solid #edf2f7}tr:last-child td{border-bottom:0}.shift-cell{font-weight:800;text-align:center;min-width:48px}.shift-A,.shift-B,.shift-D,.shift-N{background:#e7f3fb;color:#175b7b}.shift-G{background:#e5f5ed;color:#237a57}.shift-O{background:#f1f5f9;color:#829ab1}.empty{text-align:center;padding:26px;color:var(--muted);font-size:12px}
+    .badge{display:inline-flex;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800;background:#eaf0f6;color:#486581}.badge.good{background:#e6f5ed;color:#237a57}.badge.warn{background:#fff4db;color:#926100}.badge.bad{background:#ffebeb;color:#a12626}
+    .request-list{display:grid;gap:12px}.request-card{border:1px solid var(--line);border-radius:10px;padding:15px}.request-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.request-title{font-weight:750;color:var(--navy);font-size:13px}.request-meta{font-size:11px;color:var(--muted);line-height:1.6;margin-top:5px}.request-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}.request-actions button{padding:7px 10px;font-size:11px}
+    .toast{position:fixed;right:22px;bottom:22px;z-index:1000;max-width:410px;background:var(--navy);color:#fff;border-radius:10px;padding:14px 17px;box-shadow:0 12px 30px #102a4330;line-height:1.5}.toast.error{background:#9b2c2c}.toast.success{background:#237a57}
+    .security-banner{border-left:4px solid var(--gold);background:#fff8e6;padding:13px 15px;border-radius:7px;margin-bottom:17px;font-size:12px;line-height:1.6;color:#74510d}
+    .loading{font-size:12px;color:var(--muted);padding:18px;text-align:center}
+    .pill{display:inline-block;background:#e7f6f4;color:#0b6867;padding:5px 8px;border-radius:6px;font-size:10px;font-weight:750}
+    .inline-note{font-size:12px;color:var(--muted);line-height:1.7}
+    .footer-note{font-size:11px;color:#829ab1;text-align:center;padding-top:24px}
+    @media(max-width:1000px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.col-8,.col-7,.col-5,.col-4{grid-column:span 12}.brand-pane{padding:38px 30px}.brand-pane h1{font-size:32px}}
+    @media(max-width:720px){.auth-wrap{grid-template-columns:1fr}.brand-pane{display:none}.auth-card-wrap{min-height:100vh}.app-layout{display:block}.sidebar{display:flex;gap:3px;overflow:auto;padding:9px;border-right:0;border-bottom:1px solid var(--line)}.nav-label,.side-bottom{display:none}.nav-btn{min-width:max-content;width:auto;margin:0;padding:10px}.nav-btn span:last-child{display:inline}.main{padding:20px 13px 38px}.topbar{padding:12px 14px}.profile-name{max-width:135px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.profile-role{display:none}.metrics{grid-template-columns:1fr}.page-head{display:block}.date-chip{display:inline-block;margin-top:12px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.card{padding:15px}}
+  </style>
+</head>
+<body>
+  <section id="loginView" class="auth-wrap">
+    <div class="brand-pane">
+      <div>
+        <div class="brand-mark">S</div>
+        <h1>Shift management, made clear.</h1>
+        <p>Reliable rosters, controlled shift changes, and transparent swap approvals for teams across Indorama.</p>
+      </div>
+      <div class="brand-foot">INTERNAL WORKFORCE APPLICATION<br>Indorama Eleme Petrochemicals Limited</div>
+    </div>
+    <div class="auth-card-wrap">
+      <div class="auth-card">
+        <div class="pill">WORKFORCE PORTAL</div>
+        <h2 style="font-size:23px;margin-top:17px">Sign in</h2>
+        <p class="muted small">Use your employee ID or registered email address.</p>
+        <form id="loginForm">
+          <div class="field"><label for="identity">Employee ID / Email</label><input id="identity" autocomplete="username" required placeholder="e.g. 001 or name@company.com"></div>
+          <div class="field"><label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
+          <button type="submit" id="loginButton">Sign in securely</button>
+        </form>
+        <div class="auth-switch"><a href="#" id="forgotLink">Forgot your password?</a></div>
+        <div id="forgotPanel" class="hidden">
+          <div class="rule"></div>
+          <h3>Reset password</h3>
+          <p class="muted small">Answer the recovery question that you previously configured.</p>
+          <div class="field"><label for="resetIdentity">Employee ID / Email</label><input id="resetIdentity" placeholder="Employee ID or email"></div>
+          <div class="actions"><button type="button" class="secondary" id="getQuestionButton">Get recovery question</button></div>
+          <div id="recoveryQuestionWrap" class="hidden">
+            <div class="field"><label>Recovery question</label><div id="recoveryQuestionText" class="inline-note"></div></div>
+            <div class="field"><label for="resetAnswer">Recovery answer</label><input id="resetAnswer" autocomplete="off"></div>
+            <div class="field"><label for="resetNewPassword">New password</label><input id="resetNewPassword" type="password" autocomplete="new-password"></div>
+            <button type="button" id="resetPasswordButton">Reset password</button>
+          </div>
+          <div class="auth-switch"><a href="#" id="backLoginLink">Back to sign in</a></div>
+        </div>
+        <p class="footer-note">Passwords are hashed before storage. Sessions expire after six hours.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="appView" class="shell hidden">
+    <header class="topbar">
+      <div class="logo"><div class="logo-icon">S</div><div><div class="logo-title">Shift Management</div><div class="logo-sub">INTERNAL WORKFORCE PORTAL</div></div></div>
+      <div class="profile">
+        <div class="avatar" id="avatar">E</div>
+        <div><div class="profile-name" id="profileName">Employee</div><div class="profile-role" id="profileRole">Employee</div></div>
+        <button class="secondary" id="logoutButton">Sign out</button>
+      </div>
+    </header>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="nav-label">WORKSPACE</div>
+        <button class="nav-btn active" data-page="dashboard"><span class="nav-icon">▦</span><span>My roster</span></button>
+        <button class="nav-btn" data-page="schedule" id="navSchedule"><span class="nav-icon">▤</span><span>Schedule & change</span></button>
+        <button class="nav-btn" data-page="swaps"><span class="nav-icon">⇄</span><span>Shift swaps</span></button>
+        <button class="nav-btn hidden" data-page="admin" id="navAdmin"><span class="nav-icon">⚙</span><span>HR administration</span></button>
+        <button class="nav-btn" data-page="security"><span class="nav-icon">♙</span><span>Account security</span></button>
+        <button class="nav-btn hidden" data-page="audit" id="navAudit"><span class="nav-icon">≡</span><span>Audit history</span></button>
+        <div class="side-bottom">SHIFT CODES<br>G · General<br>A · Day / evening<br>B · Overnight<br>D · Day shift<br>N · Night shift<br>O · Off day</div>
+      </aside>
+      <main class="main">
+        <div id="mandatorySecurity" class="hidden">
+          <div class="page-head"><div><h1>Secure your account</h1><p>Before continuing, update the temporary password and set your recovery question.</p></div></div>
+          <div class="security-banner">This is required for first-time sign in. Choose a password you do not use for another service, and avoid a recovery answer that other people can easily guess.</div>
+          <div id="mandatorySecurityForm"></div>
+        </div>
+
+        <div id="normalPages">
+          <section class="page" id="page-dashboard">
+            <div class="page-head"><div><h1>My roster</h1><p id="welcomeText">Check your assigned shift and team schedule.</p></div><div class="date-chip" id="todayChip"></div></div>
+            <div class="metrics">
+              <div class="metric"><div class="metric-label">TODAY'S SHIFT</div><div class="metric-value" id="metricShift">—</div><div class="metric-note" id="metricShiftLabel">Current roster assignment</div></div>
+              <div class="metric"><div class="metric-label">TEAM MEMBERS VISIBLE</div><div class="metric-value" id="metricTeam">—</div><div class="metric-note">Based on your assigned access</div></div>
+              <div class="metric"><div class="metric-label">OPEN SWAP REQUESTS</div><div class="metric-value" id="metricSwaps">—</div><div class="metric-note">Requests requiring an action or decision</div></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><div><h2>14-day roster</h2><p>Your roster, or the employees assigned under your SIC / manager responsibility.</p></div><button class="secondary" id="refreshButton">Refresh</button></div>
+              <div id="rosterTable"><div class="loading">Loading roster…</div></div>
+            </div>
+            <div class="footer-note">Roster patterns repeat until changed. One-day changes and approved swaps do not alter the recurring pattern.</div>
+          </section>
+
+          <section class="page hidden" id="page-schedule">
+            <div class="page-head"><div><h1>Schedule & change</h1><p>Create future shift rotations or update a current/future roster assignment.</p></div></div>
+            <div class="grid">
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Schedule a shift</h2><p>New schedules must begin after today.</p></div><span class="pill">SIC / HR</span></div>
+                <form id="scheduleForm">
+                  <div class="field"><label for="scheduleEmployees">Employees / group</label><select id="scheduleEmployees" multiple size="7" required></select><div class="help">Select one or more employees. Use Ctrl or Command to select multiple entries.</div></div>
+                  <div class="field"><label for="schedulePattern">Shift pattern</label><select id="schedulePattern" required></select></div>
+                  <div class="field"><label for="scheduleStart">Effective start date</label><input type="date" id="scheduleStart" required></div>
+                  <div class="field"><label for="scheduleNotes">Notes (optional)</label><input id="scheduleNotes" placeholder="Operational reason or group name"></div>
+                  <div class="actions"><button type="submit">Save schedule</button></div>
+                </form>
+              </div>
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Change a shift</h2><p>Effective today or later. Past dates are blocked.</p></div><span class="pill">SIC / HR</span></div>
+                <form id="changeForm">
+                  <div class="field"><label for="changeEmployees">Employees</label><select id="changeEmployees" multiple size="5" required></select></div>
+                  <div class="field"><label for="changeMode">Change type</label><select id="changeMode"><option value="pattern">Change recurring pattern</option><option value="dates">Change selected date(s)</option></select></div>
+                  <div id="patternChangeFields">
+                    <div class="field"><label for="changePattern">New shift pattern</label><select id="changePattern"></select></div>
+                    <div class="field"><label for="changeEffective">Effective date</label><input type="date" id="changeEffective"></div>
+                  </div>
+                  <div id="dateChangeFields" class="hidden">
+                    <div class="field"><label for="dateEntries">Date and replacement shift</label><textarea id="dateEntries" placeholder="One entry per line, e.g. 2026-10-27,A&#10;2026-10-28,O"></textarea><div class="help">Enter one date and shift code per line: YYYY-MM-DD,SHIFT. Codes: G, A, B, D, N, O.</div></div>
+                  </div>
+                  <div class="field"><label for="changeReason">Reason / comment</label><input id="changeReason" placeholder="Operational exigency"></div>
+                  <div class="actions"><button type="submit">Save shift change</button></div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <section class="page hidden" id="page-swaps">
+            <div class="page-head"><div><h1>Shift swaps</h1><p>Swap one calendar day at a time. The roster changes only after all approvals.</p></div></div>
+            <div class="grid">
+              <div class="card col-5">
+                <div class="card-head"><div><h2>Request a shift swap</h2><p>Choose an eligible colleague and date.</p></div></div>
+                <form id="swapForm">
+                  <div class="field"><label for="swapPartner">Colleague</label><select id="swapPartner" required></select><div id="swapPartnerHelp" class="help"></div></div>
+                  <div class="field"><label for="swapDate">Shift date</label><input type="date" id="swapDate" required></div>
+                  <div class="field"><label for="swapComment">Comment (optional)</label><textarea id="swapComment" placeholder="Reason for requested swap"></textarea></div>
+                  <div class="actions"><button type="submit">Send swap request</button></div>
+                </form>
+                <div class="help">If you have employees reporting to you as SIC or L1 Manager, those direct downliners appear as potential partners. Otherwise, colleagues sharing your immediate SIC or L1 Manager may be shown.</div>
+              </div>
+              <div class="card col-7">
+                <div class="card-head"><div><h2>Requests & approvals</h2><p>Requests you sent, received, or are assigned to approve.</p></div><button class="secondary" id="refreshSwapsButton">Refresh</button></div>
+                <div id="swapRequests" class="request-list"><div class="loading">Loading requests…</div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page hidden" id="page-admin">
+            <div class="page-head"><div><h1>HR administration</h1><p>Assign application roles and provision employee login accounts.</p></div></div>
+            <div class="security-banner">HR is the Super Admin role. Only HR can assign roles, create temporary passwords, and overwrite past, current or future shifts by bulk CSV import.</div>
+            <div class="grid">
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Assign employee roles</h2><p>Roles can be combined, e.g. SIC + L1 Manager.</p></div></div>
+                <form id="rolesForm">
+                  <div class="field"><label for="adminEmployee">Employee</label><select id="adminEmployee" required></select></div>
+                  <div class="field"><label>Roles</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                      <label><input type="checkbox" class="roleCheckbox" value="Employee" checked style="width:auto;margin-right:5px">Employee</label>
+                      <label><input type="checkbox" class="roleCheckbox" value="SIC" style="width:auto;margin-right:5px">SIC</label>
+                      <label><input type="checkbox" class="roleCheckbox" value="L1 Manager" style="width:auto;margin-right:5px">L1 Manager</label>
+                      <label><input type="checkbox" class="roleCheckbox" value="HR" style="width:auto;margin-right:5px">HR / Super Admin</label>
+                    </div>
+                  </div>
+                  <div class="actions"><button type="submit">Save role assignment</button></div>
+                </form>
+                <div class="rule"></div>
+                <form id="provisionForm">
+                  <h3>Provision account</h3>
+                  <div class="field"><label for="provisionEmployee">Employee</label><select id="provisionEmployee" required></select></div>
+                  <div class="field"><label for="temporaryPassword">Temporary password</label><input type="password" id="temporaryPassword" minlength="10" required placeholder="At least 10 characters; include a number"><div class="help">The employee must change it at first login.</div></div>
+                  <div class="actions"><button type="submit">Set temporary password</button></div>
+                </form>
+              </div>
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Bulk shift import</h2><p>CSV overrides are allowed for past, current, and future dates.</p></div></div>
+                <form id="importForm">
+                  <div class="field"><label for="csvFile">Choose a CSV file</label><input type="file" id="csvFile" accept=".csv,text/csv"><div class="help">Required columns: Emp ID, Shift Date, Shift Code.</div></div>
+                  <div class="field"><label for="csvText">CSV contents</label><textarea id="csvText" placeholder="Emp ID,Shift Date,Shift Code&#10;001,2026-10-26,G"></textarea></div>
+                  <div class="actions"><button type="submit">Validate and import</button></div>
+                </form>
+                <div id="importResult" class="inline-note" style="margin-top:13px"></div>
+                <div id="importErrors" class="table-wrap hidden" style="margin-top:10px"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page hidden" id="page-security">
+            <div class="page-head"><div><h1>Account security</h1><p>Change your password and maintain the recovery question.</p></div></div>
+            <div class="grid">
+              <div class="card col-6">
+                <h2>Change password</h2><p class="muted small">Use at least 10 characters and include a letter and a number.</p>
+                <form id="passwordForm">
+                  <div class="field"><label for="currentPassword">Current password</label><input type="password" id="currentPassword" required autocomplete="current-password"></div>
+                  <div class="field"><label for="newPassword">New password</label><input type="password" id="newPassword" required autocomplete="new-password"></div>
+                  <div class="field"><label for="confirmPassword">Confirm new password</label><input type="password" id="confirmPassword" required autocomplete="new-password"></div>
+                  <div class="actions"><button type="submit">Change password</button></div>
+                </form>
+              </div>
+              <div class="card col-6">
+                <h2>Recovery question</h2><p class="muted small">This question is used to reset your password when you cannot sign in. Secret-question recovery is less secure than multi-factor authentication; choose an answer others cannot guess.</p>
+                <form id="recoveryForm">
+                  <div class="field"><label for="securityCurrentPassword">Current password</label><input type="password" id="securityCurrentPassword" required></div>
+                  <div class="field"><label for="securityQuestion">Your recovery question</label><input id="securityQuestion" required minlength="8" placeholder="A question only you can answer"></div>
+                  <div class="field"><label for="securityAnswer">Recovery answer</label><input id="securityAnswer" required minlength="3" autocomplete="off"></div>
+                  <div class="actions"><button type="submit">Save recovery question</button></div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <section class="page hidden" id="page-audit">
+            <div class="page-head"><div><h1>Audit history</h1><p>Recent account, roster, role, import and approval activity.</p></div><button class="secondary" id="refreshAuditButton">Refresh history</button></div>
+            <div class="card"><div id="auditTable"><div class="loading">Loading audit history…</div></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </section>
+  <div id="toast" class="toast hidden"></div>
+<script>
+(function(){
+  var token = sessionStorage.getItem("shiftMgmtToken") || "";
+  var user = null;
+  var initData = null;
+  var dashboard = null;
+  var activePage = "dashboard";
+  var temporaryPasswordRequired = false;
+  var recoveryRequired = false;
+  var toastTimer = null;
+
+  function $(id){return document.getElementById(id);}
+  function esc(value){
+    return String(value === null || value === undefined ? "" : value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+  function toast(message,type){
+    var el=$("toast");el.textContent=message;el.className="toast "+(type||"");
+    clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.className="toast hidden";},5200);
+  }
+  function setBusy(button,busy,label){
+    if(!button)return;
+    if(busy){button.dataset.oldLabel=button.textContent;button.textContent=label||"Please wait…";button.disabled=true;}
+    else{button.textContent=button.dataset.oldLabel||button.textContent;button.disabled=false;}
+  }
+  function api(name,args,success,button){
+    setBusy(button,true);
+    var runner=google.script.run
+      .withSuccessHandler(function(result){setBusy(button,false);if(success)success(result);})
+      .withFailureHandler(function(error){
+        setBusy(button,false);
+        var msg=error&&error.message?error.message:String(error||"Something went wrong.");
+        if(/session has expired|session was invalidated|sign in again/i.test(msg)){signOut(false);}
+        toast(msg,"error");
+      });
+    runner[name].apply(runner,args||[]);
+  }
+  function showLogin(){
+    $("loginView").classList.remove("hidden");$("appView").classList.add("hidden");
+  }
+  function showApp(){
+    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+  }
+  function signOut(showMessage){
+    token="";user=null;initData=null;dashboard=null;
+    sessionStorage.removeItem("shiftMgmtToken");
+    showLogin();
+    if(showMessage)toast("You have signed out.","success");
+  }
+  function login(identity,password){
+    api("loginShiftApp",[identity,password],function(result){
+      token=result.token;user=result.employee;
+      temporaryPasswordRequired=!!result.mustChangePassword;
+      recoveryRequired=!!result.needsRecoverySetup;
+      sessionStorage.setItem("shiftMgmtToken",token);
+      $("identity").value=identity;
+      if(temporaryPasswordRequired){
+        showApp();buildMandatorySecurity(true);
+      }else{
+        loadApplication();
+        if(recoveryRequired){buildMandatorySecurity(false);}
+      }
+    },$("loginButton"));
+  }
+  function loadApplication(){
+    api("getInitialData",[token],function(data){
+      initData=data;user=data.employee;
+      showApp();$("mandatorySecurity").classList.add("hidden");$("normalPages").classList.remove("hidden");
+      $("profileName").textContent=user.name||user.empId;$("profileRole").textContent=(user.roles||[]).join(" · ");
+      $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
+      $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
+      $("todayChip").textContent="Today · "+data.today;
+      $("navSchedule").classList.toggle("hidden",!data.canSchedule);
+      $("navAdmin").classList.toggle("hidden",!data.isHr);
+      $("navAudit").classList.toggle("hidden",!data.isHr);
+      configureForms();
+      loadDashboard();
+      showPage(activePage);
+      if(recoveryRequired) buildMandatorySecurity(false);
+    });
+  }
+  function buildMandatorySecurity(forcePassword){
+    showApp();
+    $("normalPages").classList.add("hidden");
+    $("mandatorySecurity").classList.remove("hidden");
+    $("mandatorySecurityForm").innerHTML=
+      '<div class="card" style="max-width:760px">'+
+      '<form id="mandatoryForm">'+
+      (forcePassword?'<div class="field"><label for="mandatoryNewPassword">New password</label><input id="mandatoryNewPassword" type="password" minlength="10" required autocomplete="new-password"></div>':'')+
+      '<div class="field"><label for="mandatoryQuestion">Recovery question</label><input id="mandatoryQuestion" minlength="8" required placeholder="A question only you can answer"></div>'+
+      '<div class="field"><label for="mandatoryAnswer">Recovery answer</label><input id="mandatoryAnswer" minlength="3" required autocomplete="off"></div>'+
+      (forcePassword?'':'<div class="field"><label for="mandatoryCurrentPassword">Current password</label><input id="mandatoryCurrentPassword" type="password" required></div>')+
+      (forcePassword?'<div class="help">The temporary password will no longer work after this change.</div>':'')+
+      '<div class="actions"><button type="submit">'+(forcePassword?'Change password and secure account':'Save recovery settings')+'</button></div></form></div>';
+    $("mandatoryForm").addEventListener("submit",function(e){
+      e.preventDefault();
+      var question=$("mandatoryQuestion").value;
+      var answer=$("mandatoryAnswer").value;
+      if(forcePassword){
+        var newPass=$("mandatoryNewPassword").value;
+        api("changeMyPassword",[token,"",newPass,question,answer],function(resp){
+          token=resp.token;sessionStorage.setItem("shiftMgmtToken",token);
+          temporaryPasswordRequired=false;recoveryRequired=false;toast(resp.message,"success");
+          $("mandatorySecurity").classList.add("hidden");$("normalPages").classList.remove("hidden");
+          loadApplication();
+        },e.submitter);
+      }else{
+        var current=$("mandatoryCurrentPassword").value;
+        api("saveAccountSecurity",[token,current,question,answer],function(resp){
+          recoveryRequired=false;toast(resp.message,"success");
+          $("mandatorySecurity").classList.add("hidden");$("normalPages").classList.remove("hidden");
+          loadApplication();
+        },e.submitter);
+      }
+    });
+  }
+  function showPage(page){
+    if(!initData)return;
+    if(page==="schedule"&&!initData.canSchedule)page="dashboard";
+    if(page==="admin"&&!initData.isHr)page="dashboard";
+    if(page==="audit"&&!initData.isHr)page="dashboard";
+    activePage=page;
+    document.querySelectorAll(".page").forEach(function(el){el.classList.toggle("hidden",el.id!=="page-"+page);});
+    document.querySelectorAll(".nav-btn[data-page]").forEach(function(el){el.classList.toggle("active",el.dataset.page===page);});
+    if(page==="swaps")loadSwaps();
+    if(page==="audit")loadAudit();
+  }
+  function configureForms(){
+    var patterns=initData.patterns||[];
+    ["schedulePattern","changePattern"].forEach(function(id){
+      $(id).innerHTML=patterns.map(function(p){return '<option value="'+esc(p.name)+'">'+esc(p.name)+' — '+esc(p.sequence)+'</option>';}).join("");
+    });
+    var team=initData.team||[];
+    var options=team.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';}).join("");
+    $("scheduleEmployees").innerHTML=options;
+    $("changeEmployees").innerHTML=options;
+    var partners=initData.swapPartners||[];
+    $("swapPartner").innerHTML='<option value="">Select colleague…</option>'+partners.map(function(e){
+      return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';
+    }).join("");
+    $("swapPartnerHelp").textContent=partners.length?"Eligible colleagues: "+partners.length:"No eligible partners found. Check the SIC and L1 Manager columns in Emp_List.";
+    ["scheduleStart","changeEffective","swapDate"].forEach(function(id){$(id).min=initData.today;});
+    $("scheduleStart").min=nextDate(initData.today);
+    if(initData.isHr){
+      api("getAdminEmployeeList",[token],function(list){
+        var allOptions=list.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+') · '+esc(e.role||'Employee')+'</option>';}).join("");
+        $("adminEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
+        $("provisionEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
+      });
+    }
+  }
+  function nextDate(iso){
+    var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+1);
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
+  function loadDashboard(){
+    api("getDashboardData",[token],function(data){
+      dashboard=data;
+      $("metricShift").textContent=data.currentShift;
+      var shift=(initData.shifts||[]).find(function(s){return s.code===data.currentShift;});
+      $("metricShiftLabel").textContent=shift?(shift.label+(shift.in?" · "+shift.in+"–"+shift.out:"")):"Current roster assignment";
+      $("metricTeam").textContent=(data.roster.rows||[]).length;
+      $("metricSwaps").textContent=(data.swaps||[]).filter(function(s){return s.canRespondAsPartner||s.canApproveAsSic||s.canApproveAsManager||(["Pending Partner","Pending Approvals"].indexOf(s.status)>=0&&s.isRequester);}).length;
+      renderRoster(data.roster);
+    });
+  }
+  function renderRoster(roster){
+    if(!roster||!roster.dates||!roster.rows){$("rosterTable").innerHTML='<div class="empty">No roster is available.</div>';return;}
+    if(!roster.rows.length){$("rosterTable").innerHTML='<div class="empty">No employees are assigned under your access. Your personal roster is shown when available.</div>';return;}
+    var html='<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Emp ID</th>';
+    roster.dates.forEach(function(date){html+='<th>'+esc(date.slice(5))+'</th>';});
+    html+='</tr></thead><tbody>';
+    roster.rows.forEach(function(row){
+      html+='<tr><td>'+esc(row.employee.name||"")+'</td><td>'+esc(row.employee.empId)+'</td>';
+      roster.dates.forEach(function(date){
+        var code=row.shifts[date]||"—";
+        html+='<td class="shift-cell '+(code!=="—"?"shift-"+esc(code):"")+'">'+esc(code)+'</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table></div><div class="help">Roster dates use Africa/Lagos time. Pattern dates are calculated from their effective start date; one-day overrides take precedence on that date.</div>';
+    $("rosterTable").innerHTML=html;
+  }
+  function selectedValues(id){
+    return Array.from($(id).selectedOptions).map(function(o){return o.value;}).filter(Boolean);
+  }
+  function loadSwaps(){
+    api("getMySwapRequests",[token],function(requests){renderSwaps(requests);});
+  }
+  function renderSwaps(requests){
+    if(!requests||!requests.length){$("swapRequests").innerHTML='<div class="empty">No shift swap requests are available to you.</div>';return;}
+    var html="";
+    requests.forEach(function(r){
+      var badgeClass=/Approved/.test(r.status)?"good":/Rejected|Declined/.test(r.status)?"bad":/Pending|Review/.test(r.status)?"warn":"";
+      html+='<div class="request-card"><div class="request-top"><div><div class="request-title">'+esc(r.requesterName)+' ⇄ '+esc(r.partnerName)+'</div>'+
+        '<div class="request-meta">Date: '+esc(r.date)+'<br>'+esc(r.requesterShift)+' ⇄ '+esc(r.partnerShift)+' · Request '+esc(r.requestId.slice(0,8))+'</div></div>'+
+        '<span class="badge '+badgeClass+'">'+esc(r.status)+'</span></div>'+
+        '<div class="request-meta">SIC: '+esc(r.sicProgress)+'<br>L1 Manager: '+esc(r.managerProgress)+'</div>'+
+        (r.comment?'<div class="request-meta">Comment: '+esc(r.comment)+'</div>':'')+
+        '<div class="request-actions">';
+      if(r.canRespondAsPartner){
+        html+='<button class="success" data-swap="'+esc(r.requestId)+'" data-action="partner-accept">Accept</button><button class="danger" data-swap="'+esc(r.requestId)+'" data-action="partner-decline">Decline</button>';
+      }
+      if(r.canApproveAsSic){
+        html+='<button class="success" data-swap="'+esc(r.requestId)+'" data-action="sic-approve">Approve as SIC</button><button class="danger" data-swap="'+esc(r.requestId)+'" data-action="sic-reject">Reject as SIC</button>';
+      }
+      if(r.canApproveAsManager){
+        html+='<button class="success" data-swap="'+esc(r.requestId)+'" data-action="manager-approve">Approve as L1 Manager</button><button class="danger" data-swap="'+esc(r.requestId)+'" data-action="manager-reject">Reject as L1 Manager</button>';
+      }
+      if(!r.canRespondAsPartner&&!r.canApproveAsSic&&!r.canApproveAsManager)html+='<span class="muted small">No action is currently required from you.</span>';
+      html+='</div></div>';
+    });
+    $("swapRequests").innerHTML=html;
+  }
+  function loadAudit(){
+    api("getAuditRows",[token,100],function(rows){
+      if(!rows.length){$("auditTable").innerHTML='<div class="empty">No audit events yet.</div>';return;}
+      var html='<div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Employees</th><th>Dates</th><th>Outcome</th><th>Details</th></tr></thead><tbody>';
+      rows.forEach(function(r){html+='<tr><td>'+esc(r.timestamp)+'</td><td>'+esc(r.actor)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.employees)+'</td><td>'+esc(r.dates)+'</td><td>'+esc(r.outcome)+'</td><td>'+esc(r.details)+'</td></tr>';});
+      $("auditTable").innerHTML=html+'</tbody></table></div>';
+    });
+  }
+  $("loginForm").addEventListener("submit",function(e){
+    e.preventDefault();login($("identity").value,$("loginPassword").value);
+  });
+  $("forgotLink").addEventListener("click",function(e){
+    e.preventDefault();$("forgotPanel").classList.remove("hidden");$("forgotLink").classList.add("hidden");
+    $("resetIdentity").value=$("identity").value;
+  });
+  $("backLoginLink").addEventListener("click",function(e){
+    e.preventDefault();$("forgotPanel").classList.add("hidden");$("forgotLink").classList.remove("hidden");
+    $("recoveryQuestionWrap").classList.add("hidden");
+  });
+  $("getQuestionButton").addEventListener("click",function(){
+    api("getRecoveryQuestion",[$("resetIdentity").value],function(result){
+      if(!result.found){toast(result.message||"No recovery question found.","error");return;}
+      $("recoveryQuestionText").textContent=result.question;
+      $("recoveryQuestionWrap").classList.remove("hidden");
+    },$("getQuestionButton"));
+  });
+  $("resetPasswordButton").addEventListener("click",function(){
+    api("resetPasswordWithSecret",[$("resetIdentity").value,$("resetAnswer").value,$("resetNewPassword").value],function(result){
+      toast(result.message,"success");$("forgotPanel").classList.add("hidden");$("forgotLink").classList.remove("hidden");
+      $("identity").value=$("resetIdentity").value;$("loginPassword").value="";
+      $("recoveryQuestionWrap").classList.add("hidden");
+    },$("resetPasswordButton"));
+  });
+  $("logoutButton").addEventListener("click",function(){signOut(true);});
+  document.querySelectorAll(".nav-btn[data-page]").forEach(function(button){
+    button.addEventListener("click",function(){showPage(button.dataset.page);});
+  });
+  $("refreshButton").addEventListener("click",function(){loadDashboard();},false);
+  $("refreshSwapsButton").addEventListener("click",function(){loadSwaps();},false);
+  $("refreshAuditButton").addEventListener("click",function(){loadAudit();},false);
+  $("changeMode").addEventListener("change",function(){
+    var pattern=this.value==="pattern";
+    $("patternChangeFields").classList.toggle("hidden",!pattern);
+    $("dateChangeFields").classList.toggle("hidden",pattern);
+  });
+  $("scheduleForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var ids=selectedValues("scheduleEmployees");
+    var req={employeeIds:ids,patternName:$("schedulePattern").value,startDate:$("scheduleStart").value,notes:$("scheduleNotes").value};
+    api("createShiftSchedule",[token,req],function(result){toast(result.message,"success");$("scheduleNotes").value="";loadDashboard();},e.submitter);
+  });
+  $("changeForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var mode=$("changeMode").value;
+    var req={employeeIds:selectedValues("changeEmployees"),mode:mode,reason:$("changeReason").value};
+    if(mode==="pattern"){req.patternName=$("changePattern").value;req.effectiveDate=$("changeEffective").value;}
+    else{
+      req.entries=$("dateEntries").value.split(/\r?\n/).map(function(line){
+        var parts=line.split(",");
+        return {date:(parts[0]||"").trim(),shiftCode:(parts[1]||"").trim().toUpperCase()};
+      }).filter(function(e){return e.date&&e.shiftCode;});
+    }
+    api("createShiftChange",[token,req],function(result){toast(result.message,"success");$("changeReason").value="";loadDashboard();},e.submitter);
+  });
+  $("swapForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    api("submitShiftSwap",[token,$("swapPartner").value,$("swapDate").value,$("swapComment").value],function(result){
+      toast(result.message,"success");$("swapComment").value="";loadSwaps();loadDashboard();
+    },e.submitter);
+  });
+  $("swapRequests").addEventListener("click",function(e){
+    var btn=e.target.closest("button[data-action]");if(!btn)return;
+    var requestId=btn.dataset.swap;var action=btn.dataset.action;
+    if(action==="partner-accept"||action==="partner-decline"){
+      api("respondToSwapPartner",[token,requestId,action==="partner-accept"?"accept":"decline",""],function(result){toast(result.message,"success");loadSwaps();loadDashboard();},btn);
+    }else{
+      var type=action.indexOf("sic-")===0?"SIC":"L1 Manager";
+      var decision=action.indexOf("-approve")>=0?"approve":"reject";
+      api("decideSwapApproval",[token,requestId,type,decision,""],function(result){toast(result.message,"success");loadSwaps();loadDashboard();},btn);
+    }
+  });
+  $("rolesForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var roles=Array.from(document.querySelectorAll(".roleCheckbox:checked")).map(function(c){return c.value;});
+    api("adminSetRoles",[token,$("adminEmployee").value,roles],function(result){toast("Roles saved for "+result.employee.name+".","success");loadApplication();},e.submitter);
+  });
+  $("provisionForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    api("adminProvisionAccount",[token,$("provisionEmployee").value,$("temporaryPassword").value],function(result){
+      toast(result.message,"success");$("temporaryPassword").value="";
+    },e.submitter);
+  });
+  $("csvFile").addEventListener("change",function(){
+    var file=this.files&&this.files[0];if(!file)return;
+    var reader=new FileReader();reader.onload=function(){ $("csvText").value=String(reader.result||""); };
+    reader.onerror=function(){toast("Could not read the selected file.","error");};reader.readAsText(file);
+  });
+  $("importForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    api("bulkImportShifts",[token,$("csvText").value],function(result){
+      $("importResult").textContent=result.message;
+      if(result.rejectedRows&&result.rejectedRows.length){
+        var html='<table><thead><tr><th>Row</th><th>Employee ID</th><th>Date</th><th>Errors</th></tr></thead><tbody>';
+        result.rejectedRows.forEach(function(r){html+='<tr><td>'+esc(r.row)+'</td><td>'+esc(r.employeeId)+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.errors)+'</td></tr>';});
+        $("importErrors").innerHTML=html+'</tbody></table>';$("importErrors").classList.remove("hidden");
+      }else{$("importErrors").classList.add("hidden");}
+      toast(result.message,"success");loadDashboard();
+    },e.submitter);
+  });
+  $("passwordForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    if($("newPassword").value!==$("confirmPassword").value){toast("New password and confirmation do not match.","error");return;}
+    api("changeMyPassword",[token,$("currentPassword").value,$("newPassword").value,"",""],function(result){
+      token=result.token;sessionStorage.setItem("shiftMgmtToken",token);
+      $("currentPassword").value="";$("newPassword").value="";$("confirmPassword").value="";
+      toast(result.message,"success");loadApplication();
+    },e.submitter);
+  });
+  $("recoveryForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    api("saveAccountSecurity",[token,$("securityCurrentPassword").value,$("securityQuestion").value,$("securityAnswer").value],function(result){
+      $("securityCurrentPassword").value="";$("securityAnswer").value="";toast(result.message,"success");
+    },e.submitter);
+  });
+  function restoreSession(){
+    if(!token){showLogin();return;}
+    api("getInitialData",[token],function(result){
+      initData=result;user=result.employee;showApp();$("normalPages").classList.remove("hidden");$("mandatorySecurity").classList.add("hidden");
+      $("profileName").textContent=user.name||user.empId;$("profileRole").textContent=(user.roles||[]).join(" · ");
+      $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
+      $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
+      $("todayChip").textContent="Today · "+result.today;
+      $("navSchedule").classList.toggle("hidden",!result.canSchedule);$("navAdmin").classList.toggle("hidden",!result.isHr);$("navAudit").classList.toggle("hidden",!result.isHr);
+      configureForms();loadDashboard();showPage(activePage);
+    });
+  }
+  restoreSession();
+})();
+</script>
+</body>
+</html>
