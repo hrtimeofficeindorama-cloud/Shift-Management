@@ -306,6 +306,7 @@ function appendObjects_(sheetName, objects) {
     return headers.map(function(h) { return obj[h] === undefined || obj[h] === null ? "" : obj[h]; });
   });
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  if (sheetName === SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS || sheetName === SHIFT_APP_CONFIG.TABLES.OVERRIDES) invalidateShiftDataCache_();
 }
 
 function updateTableRecord_(sheetName, idHeader, idValue, updates) {
@@ -320,6 +321,7 @@ function updateTableRecord_(sheetName, idHeader, idValue, updates) {
     if (idx >= 0) row[idx] = updates[k];
   });
   sheet.getRange(target.__rowNum, 1, 1, headers.length).setValues([row]);
+  if (sheetName === SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS || sheetName === SHIFT_APP_CONFIG.TABLES.OVERRIDES) invalidateShiftDataCache_();
   return target;
 }
 
@@ -371,17 +373,32 @@ function createRosterGrid_(employees, fromDate, toDate) {
   return { dates: dates, rows: rows };
 }
 
+var SHIFT_ROSTER_DATA_CACHE_ = null;
+
+function invalidateShiftDataCache_() {
+  SHIFT_ROSTER_DATA_CACHE_ = null;
+}
+
+function getShiftDataSnapshot_() {
+  if (!SHIFT_ROSTER_DATA_CACHE_) {
+    SHIFT_ROSTER_DATA_CACHE_ = {
+      overrides: getTableRows_(SHIFT_APP_CONFIG.TABLES.OVERRIDES),
+      assignments: getTableRows_(SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS)
+    };
+  }
+  return SHIFT_ROSTER_DATA_CACHE_;
+}
+
 function getShiftForDate_(empId, dateIso) {
-  var overrides = getTableRows_(SHIFT_APP_CONFIG.TABLES.OVERRIDES);
-  for (var i = overrides.length - 1; i >= 0; i--) {
-    var ov = overrides[i];
+  var snapshot = getShiftDataSnapshot_();
+  for (var i = snapshot.overrides.length - 1; i >= 0; i--) {
+    var ov = snapshot.overrides[i];
     var ovDate = normalizeSheetDate_(ov["Shift Date"]);
     if (String(ov["Emp ID"]) === String(empId) && ovDate === dateIso && String(ov.Status || "Active") === "Active") {
       return String(ov["Shift Code"] || "");
     }
   }
-  var assignments = getTableRows_(SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS);
-  var applicable = assignments.filter(function(a) {
+  var applicable = snapshot.assignments.filter(function(a) {
     if (String(a["Emp ID"]) !== String(empId) || String(a.Status || "Active") !== "Active") return false;
     var start = normalizeSheetDate_(a["Effective Start Date"]);
     var end = normalizeSheetDate_(a["Effective End Date"]);
