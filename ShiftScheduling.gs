@@ -201,6 +201,8 @@ function bulkImportShifts(token, csvText) {
   var idxShift = findHeaderIndex_(headers, ["Shift Code", "Shift", "Code"]);
   if (idxEmp < 0 || idxDate < 0 || idxShift < 0) throw new Error("Required CSV columns: Emp ID, Shift Date, Shift Code.");
   var validCodes = Object.keys(SHIFT_APP_CONFIG.SHIFT_CODES);
+  var directoryMap = {};
+  getEmployees_().forEach(function(employee) { directoryMap[norm_(employeeId_(employee))] = employee; });
   var seen = {};
   var good = [];
   var rejected = [];
@@ -212,7 +214,7 @@ function bulkImportShifts(token, csvText) {
     var shift = String(row[idxShift] || "").trim().toUpperCase();
     var rowNum = i + 1;
     var issues = [];
-    var emp = empId ? findEmployeeById_(empId) : null;
+    var emp = empId ? (directoryMap[norm_(empId)] || null) : null;
     var date = "";
     if (!empId || !emp) issues.push("Unknown or missing employee ID");
     try { date = parseImportDate_(rawDate); } catch (err) { issues.push(err.message); }
@@ -223,20 +225,32 @@ function bulkImportShifts(token, csvText) {
     if (issues.length) rejected.push({ row: rowNum, employeeId: empId, date: rawDate, errors: issues.join("; ") });
     else good.push({ emp: emp, empId: empId, date: date, shift: shift });
   }
+  var oldValues = [];
+  var newValues = [];
+  var overrideRows = [];
+  var auditRows = [];
   good.forEach(function(item) {
     var oldShift = getShiftForDate_(item.empId, item.date);
-    appendObjects_(SHIFT_APP_CONFIG.TABLES.OVERRIDES, [{
+    oldValues.push({ empId: item.empId, date: item.date, shift: oldShift });
+    newValues.push({ empId: item.empId, date: item.date, shift: item.shift });
+    overrideRows.push({
       "Override ID": Utilities.getUuid(), "Emp ID": item.empId, "Shift Date": item.date,
       "Shift Code": item.shift, "Source": "HR Bulk Import", "Reason": "HR bulk import",
       "Related Request ID": "", "Created By": ctx.empId, "Created At": new Date(),
       "Previous Shift": oldShift, "Status": "Active"
-    }]);
-    addAudit_(ctx.empId, "HR_BULK_IMPORT_ROW", [item.empId], [item.date],
-      { shift: oldShift }, { shift: item.shift }, "HR bulk shift import", "Success");
+    });
+    auditRows.push({
+      "Audit ID": Utilities.getUuid(), "Actor ID": ctx.empId, "Action": "HR_BULK_IMPORT_ROW",
+      "Employee IDs": item.empId, "Effective Dates": item.date,
+      "Old Values": JSON.stringify({ shift: oldShift }), "New Values": JSON.stringify({ shift: item.shift }),
+      "Details": "HR bulk shift import", "Timestamp": new Date(), "Outcome": "Success"
+    });
   });
+  appendObjects_(SHIFT_APP_CONFIG.TABLES.OVERRIDES, overrideRows);
+  appendObjects_(SHIFT_APP_CONFIG.TABLES.AUDIT, auditRows);
   addAudit_(ctx.empId, "HR_BULK_IMPORT", good.map(function(r) { return r.empId; }),
-    good.map(function(r) { return r.date; }), "", "", "Processed " + good.length + " valid rows; rejected " + rejected.length,
-    "Completed with validation");
+    good.map(function(r) { return r.date; }), oldValues, newValues,
+    "Processed " + good.length + " valid rows; rejected " + rejected.length, "Completed with validation");
   var rejectionCsv = "Row,Emp ID,Shift Date,Errors\n" + rejected.map(function(r) {
     return [r.row, r.employeeId, r.date, r.errors].map(csvEscape_).join(",");
   }).join("\n");
