@@ -1,9 +1,17 @@
 /**
  * Web app entry point and dashboard aggregation.
  */
-function doGet() {
+function doGet(e) {
+  var approvalToken = e && e.parameter ? String(e.parameter.approvalToken || "") : "";
+  if (approvalToken) {
+    var template = HtmlService.createTemplateFromFile("EmailApproval");
+    template.approvalToken = approvalToken;
+    return template.evaluate()
+      .setTitle("Shift Management | Email Approval")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
   return HtmlService.createHtmlOutputFromFile("Index")
-    .setTitle("Indorama | Shift Management")
+    .setTitle("Shift Management")
     .addMetaTag("viewport", "width=device-width, initial-scale=1");
 }
 
