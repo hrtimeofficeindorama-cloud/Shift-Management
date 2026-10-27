@@ -90,6 +90,8 @@ Accepted dates: YYYY-MM-DD or M/D/YYYY. HR import allows past/current/future dat
 - Pattern sequences repeat indefinitely until a new pattern-level assignment is effective.
 - A single date override does not change the recurring cycle on subsequent dates.
 - Swap partner acceptance precedes SIC and L1 Manager approvals; the swap is applied only after all configured approvers approve.
+- Automated mail uses the sender display name `Shift Management`; the underlying sender address remains the Google account that executes the web app.
+- Shift-swap emails include Accept/Decline or Approve/Reject links. Links expire after 72 hours, can be used once, and open a confirmation page; the decision is recorded only after the recipient confirms, helping prevent email-security scanners from accidentally acting on a link.
 - HR bulk import may override past, present, and future dates.
 
 ## Security notes and remaining configuration
@@ -102,6 +104,14 @@ Accepted dates: YYYY-MM-DD or M/D/YYYY. HR import allows past/current/future dat
 - This is a spreadsheet-backed access-control implementation. Obtain IT/security review before production release.
 - The supplied BRD leaves decisions for HR confirmation (for example, swap compatibility rules across departments and bulk-import notifications). The app follows the stated requirements and processes valid bulk-import rows while reporting invalid rows. Swap requests require both employees' identifiable SIC and L1 Manager approvers.
 - No Google OAuth / SSO integration is included; sign-in uses the password hash in Emp_List.
+
+## Email action links and sender display name
+
+- `MailApp.sendEmail()` uses `name: "Shift Management"` for the sender display name. This does not change the actual sender email address; mail is still sent by the Google account that executes the deployed web app.
+- After deploying the updated scripts, run `setupShiftManagement()` once from the Apps Script editor to create the `Shift_Swap_Approval_Links` sheet.
+- Update the web-app deployment to execute as the new project owner. Configure the deployment audience so recipients can open the action links under company access policy. Because these links are bearer credentials, do not forward them; they expire after 72 hours, are single-use, and should only be sent to the designated approver email address.
+- Email links do not alter the roster on a simple GET/open. The recipient sees a request summary and must click the confirmation button on the web page to record Accept, Decline, Approve, or Reject. No Shift Management password is required on that confirmation page.
+- Verify a partner acceptance, partner decline, SIC approval, L1 Manager approval, rejection, expiry, and replayed-link attempt before production rollout.
 
 ## GitHub deployment
 
