@@ -26,5 +26,6 @@ jobs:
           echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
           echo '{"scriptId":"${{ secrets.SCRIPT_ID }}","rootDir":"."}' > .clasp.json
 
+
       - name: Push Code to Apps Script
         run: clasp push -f
