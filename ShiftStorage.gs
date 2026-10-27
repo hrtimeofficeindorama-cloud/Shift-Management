@@ -24,6 +24,10 @@ SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
   "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
   "Expires At", "Status", "Created At", "Used At"
 ];
+SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
+  "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
+  "Expires At", "Status", "Created At", "Used At"
+];
 
 function ensureAllTables_() {
   var ss = SpreadsheetApp.openById(SHIFT_APP_CONFIG.SPREADSHEET_ID);
