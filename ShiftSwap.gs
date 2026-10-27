@@ -294,6 +294,11 @@ function sendSwapActionNotice_(emp, requestId, approverType, subject, body) {
 }
 
 function createSwapApprovalLinks_(requestId, approverId, approverType) {
+  try { tableSheet_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS); }
+  catch (setupError) {
+    console.error("Email approval link storage is not set up. Run setupShiftManagement(): " + setupError.message);
+    return [];
+  }
   var appUrl = "";
   try { appUrl = String(ScriptApp.getService().getUrl() || "").trim(); } catch (err) {}
   if (!appUrl) return [];
