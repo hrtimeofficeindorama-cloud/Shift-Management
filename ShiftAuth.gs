@@ -4,6 +4,7 @@
  */
 var SHIFT_SESSION_TTL_SECONDS = 21600;
 var SHIFT_HASH_ROUNDS = 12000;
+// Configure SHIFT_TEMP_PASSWORD in Apps Script Script Properties; do not commit credentials.
 
 function loginShiftApp(identity, password) {
   identity = String(identity || "").trim();
@@ -117,7 +118,7 @@ function saveAccountSecurity(token, currentPassword, secretQuestion, secretAnswe
 
 function adminSetRoles(token, targetEmpId, roles) {
   var ctx = requireFullSession_(token);
-  requireRole_(ctx.employee, "HR");
+  requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
   var chosen = Array.isArray(roles) ? roles : String(roles || "").split(/[,;|]/);
@@ -141,26 +142,88 @@ function adminSetRoles(token, targetEmpId, roles) {
   return { success: true, employee: publicEmployee_(findEmployeeById_(employeeId_(target))) };
 }
 
-function adminProvisionAccount(token, targetEmpId, temporaryPassword) {
+function adminProvisionAccount(token, targetEmpId) {
   var ctx = requireFullSession_(token);
-  requireRole_(ctx.employee, "HR");
+  requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
-  validatePassword_(temporaryPassword);
+  return resetEmployeeToTemporary_(target, ctx.empId, "ACCOUNT_PROVISIONED");
+}
+
+function adminResetEmployeePassword(token, targetEmpId) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  var target = findEmployeeByIdentity_(targetEmpId);
+  if (!target) throw new Error("Employee ID was not found.");
+  return resetEmployeeToTemporary_(target, ctx.empId, "PASSWORD_RESET_BY_HR");
+}
+
+function resetEmployeeToTemporary_(target, actorId, action) {
+  var temporaryPassword = getShiftTemporaryPassword_();
   updateEmployeeFields_(target, {
     "Password|Password Hash|Login Password": passwordHash_(temporaryPassword, true),
     "Secret Question|Security Question|Recovery Question": "",
     "Secret Answer Hash": ""
   });
   bumpAuthVersion_(employeeId_(target));
-  addAudit_(ctx.empId, "ACCOUNT_PROVISIONED", [employeeId_(target)], [], "", "", "Temporary account provisioned by HR", "Success");
-  return { success: true, message: "Temporary password set. The employee must change it at first login and set a recovery question." };
+  addAudit_(actorId, action, [employeeId_(target)], [], "", "", "HR reset account to the standard temporary password", "Success");
+  return { success: true, message: "Temporary password reset to the configured standard credential. The employee must change it and set a recovery question at next sign-in." };
+}
+
+function adminResetAllPasswordsToTemporary(token, confirmation) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  if (String(confirmation || "") !== "RESET ALL") throw new Error("Type RESET ALL to confirm the bulk password reset.");
+  var temporaryPassword = getShiftTemporaryPassword_();
+  var employees = getEmployees_();
+  if (!employees.length) throw new Error("No employees were found in Emp_List.");
+  var sheet = openEmployeeSheet_();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(function(h) { return String(h).trim(); });
+  var passwordHeader = findHeaderName_(headers, ["Password", "Password Hash", "Login Password"]);
+  var questionHeader = findHeaderName_(headers, ["Secret Question", "Security Question", "Recovery Question"]);
+  var answerHeader = findHeaderName_(headers, ["Secret Answer Hash"]);
+  if (!passwordHeader || !questionHeader || !answerHeader) throw new Error("Account columns are missing. Run setupShiftManagement() first.");
+  var rows = sheet.getRange(2, 1, Math.max(0, sheet.getLastRow() - 1), sheet.getLastColumn()).getValues();
+  employees.forEach(function(emp) {
+    var index = Number(emp.__rowNum) - 2;
+    if (index < 0 || index >= rows.length) return;
+    rows[index][headers.indexOf(passwordHeader)] = passwordHash_(temporaryPassword, true);
+    rows[index][headers.indexOf(questionHeader)] = "";
+    rows[index][headers.indexOf(answerHeader)] = "";
+  });
+  if (rows.length) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  employees.forEach(function(emp) { bumpAuthVersion_(employeeId_(emp)); });
+  var ids = employees.map(employeeId_);
+  addAudit_(ctx.empId, "ALL_PASSWORDS_RESET_TO_TEMPORARY", ids, [], "", "",
+    "HR reset all " + employees.length + " employee account(s) to the standard temporary password", "Success");
+  return { success: true, count: employees.length, message: employees.length + " employee account(s) reset to the configured standard temporary password. All affected employees must change it and set a recovery question at next sign-in." };
 }
 
 function getAdminEmployeeList(token) {
   var ctx = requireFullSession_(token);
-  requireRole_(ctx.employee, "HR");
+  requireActiveRole_(ctx, "HR");
   return getEmployees_().map(publicEmployee_);
+}
+
+function setActiveRole(token, requestedRole) {
+  var ctx = getAuthContext_(token);
+  var role = String(requestedRole || "").trim();
+  if (getRoles_(ctx.employee).indexOf(role) < 0) throw new Error("You cannot switch to a role that is not assigned to your account.");
+  var cache = CacheService.getScriptCache();
+  var key = "SHIFT_SESSION_" + sha256Text_(String(token));
+  var raw = cache.get(key);
+  if (!raw) throw new Error("Your session has expired. Sign in again.");
+  var session = JSON.parse(raw);
+  session.activeRole = role;
+  cache.put(key, JSON.stringify(session), SHIFT_SESSION_TTL_SECONDS);
+  addAudit_(ctx.empId, "ACTIVE_ROLE_CHANGED", [ctx.empId], [], ctx.activeRole, role, "User switched interface role", "Success");
+  return { success: true, activeRole: role };
+}
+
+function requireActiveRole_(ctx, requiredRole) {
+  if (!ctx || ctx.activeRole !== requiredRole || getRoles_(ctx.employee).indexOf(requiredRole) < 0) {
+    throw new Error("Switch to the " + requiredRole + " role to perform this action.");
+  }
 }
 
 function getAuthContext_(token) {
@@ -183,8 +246,11 @@ function getAuthContext_(token) {
   var stored = String(getEmpValue_(emp, ["Password", "Password Hash", "Login Password"]) || "");
   var question = String(getEmpValue_(emp, ["Secret Question", "Security Question", "Recovery Question"]) || "").trim();
   var answerHash = String(getEmpValue_(emp, ["Secret Answer Hash"]) || "").trim();
+  var roles = getRoles_(emp);
+  var activeRole = String(session.activeRole || (roles.indexOf("HR") >= 0 ? "HR" : roles[0] || "Employee"));
+  if (roles.indexOf(activeRole) < 0) activeRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   return {
-    employee: emp, empId: employeeId_(emp),
+    employee: emp, empId: employeeId_(emp), activeRole: activeRole,
     mustChangePassword: stored.indexOf("TEMPv1$") === 0,
     needsRecoverySetup: !question || !answerHash,
     token: token
@@ -200,8 +266,10 @@ function requireFullSession_(token) {
 
 function issueSession_(emp, version) {
   var token = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
+  var roles = getRoles_(emp);
+  var initialRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   CacheService.getScriptCache().put("SHIFT_SESSION_" + sha256Text_(token), JSON.stringify({
-    empId: employeeId_(emp), version: Number(version || 1), issued: new Date().getTime()
+    empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole, issued: new Date().getTime()
   }), SHIFT_SESSION_TTL_SECONDS);
   return token;
 }
@@ -292,4 +360,11 @@ function validatePassword_(password) {
 function validateRecovery_(question, answer) {
   if (String(question || "").trim().length < 8) throw new Error("Enter a meaningful recovery question (at least 8 characters).");
   if (String(answer || "").trim().length < 3) throw new Error("Recovery answer must contain at least 3 characters.");
+}
+
+function getShiftTemporaryPassword_() {
+  var password = String(PropertiesService.getScriptProperties().getProperty("SHIFT_TEMP_PASSWORD") || "");
+  if (!password) throw new Error("Set Script Property SHIFT_TEMP_PASSWORD to the approved temporary password before using HR account reset.");
+  validatePassword_(password);
+  return password;
 }

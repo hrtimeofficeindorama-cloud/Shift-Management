@@ -253,7 +253,7 @@ function datesForRange_(fromDate, toDate) {
   var to = parseIsoDate_(toDate);
   if (to < from) throw new Error("End date must be on or after start date.");
   var days = Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
-  if (days > 62) throw new Error("Please request a maximum range of 62 calendar days at a time.");
+  if (days > 366) throw new Error("Please request a maximum range of 366 calendar days at a time.");
   var list = [];
   for (var i = 0; i < days; i++) list.push(isoDate_(new Date(from.getFullYear(), from.getMonth(), from.getDate() + i, 12, 0, 0)));
   return list;

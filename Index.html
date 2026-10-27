@@ -55,6 +55,11 @@
     .pill{display:inline-block;background:#e7f6f4;color:#0b6867;padding:5px 8px;border-radius:6px;font-size:10px;font-weight:750}
     .inline-note{font-size:12px;color:var(--muted);line-height:1.7}
     .footer-note{font-size:11px;color:#829ab1;text-align:center;padding-top:24px}
+    .password-control{display:flex;gap:7px;align-items:stretch}.password-control input{min-width:0;flex:1}.password-control button{width:auto;margin:0;white-space:nowrap;padding:9px 12px}
+    .role-switch{display:flex;align-items:center;gap:7px}.role-switch label{margin:0;color:#d7e9f3}.role-switch select{width:auto;min-width:125px;padding:8px 10px}
+    .employee-search{margin:0 0 7px}.roster-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.roster-controls .field{min-width:145px;margin:0}.roster-controls button{height:39px}
+    .date-shift-builder{display:grid;grid-template-columns:minmax(140px,1fr) minmax(180px,1fr) auto;gap:9px;align-items:end}.date-shift-builder .field{margin:0}.date-shift-builder button{white-space:nowrap}
+    @media(max-width:720px){.role-switch{width:100%;justify-content:flex-end}.role-switch select{min-width:110px}.date-shift-builder{grid-template-columns:1fr}.roster-controls .field{min-width:calc(50% - 6px)}}
     @media(max-width:1000px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.col-8,.col-7,.col-5,.col-4{grid-column:span 12}.brand-pane{padding:38px 30px}.brand-pane h1{font-size:32px}}
     @media(max-width:720px){.auth-wrap{grid-template-columns:1fr}.brand-pane{display:none}.auth-card-wrap{min-height:100vh}.app-layout{display:block}.sidebar{display:flex;gap:3px;overflow:auto;padding:9px;border-right:0;border-bottom:1px solid var(--line)}.nav-label,.side-bottom{display:none}.nav-btn{min-width:max-content;width:auto;margin:0;padding:10px}.nav-btn span:last-child{display:inline}.main{padding:20px 13px 38px}.topbar{padding:12px 14px}.profile-name{max-width:135px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.profile-role{display:none}.metrics{grid-template-columns:1fr}.page-head{display:block}.date-chip{display:inline-block;margin-top:12px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.card{padding:15px}}
   </style>
@@ -76,7 +81,7 @@
         <p class="muted small">Use your employee ID or registered email address.</p>
         <form id="loginForm">
           <div class="field"><label for="identity">Employee ID / Email</label><input id="identity" autocomplete="username" required placeholder="e.g. 001 or name@company.com"></div>
-          <div class="field"><label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
+          <div class="field"><label for="loginPassword">Password</label><div class="password-control"><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"><button type="button" class="secondary" data-toggle-password="loginPassword">Show</button></div></div>
           <button type="submit" id="loginButton">Sign in securely</button>
         </form>
         <div class="auth-switch"><a href="#" id="forgotLink">Forgot your password?</a></div>
@@ -89,7 +94,7 @@
           <div id="recoveryQuestionWrap" class="hidden">
             <div class="field"><label>Recovery question</label><div id="recoveryQuestionText" class="inline-note"></div></div>
             <div class="field"><label for="resetAnswer">Recovery answer</label><input id="resetAnswer" autocomplete="off"></div>
-            <div class="field"><label for="resetNewPassword">New password</label><input id="resetNewPassword" type="password" autocomplete="new-password"></div>
+            <div class="field"><label for="resetNewPassword">New password</label><div class="password-control"><input id="resetNewPassword" type="password" autocomplete="new-password" minlength="10"><button type="button" class="secondary" data-toggle-password="resetNewPassword">Show</button></div></div><div class="field"><label for="resetConfirmPassword">Confirm new password</label><div class="password-control"><input id="resetConfirmPassword" type="password" autocomplete="new-password" minlength="10"><button type="button" class="secondary" data-toggle-password="resetConfirmPassword">Show</button></div></div>
             <button type="button" id="resetPasswordButton">Reset password</button>
           </div>
           <div class="auth-switch"><a href="#" id="backLoginLink">Back to sign in</a></div>
@@ -105,6 +110,7 @@
       <div class="profile">
         <div class="avatar" id="avatar">E</div>
         <div><div class="profile-name" id="profileName">Employee</div><div class="profile-role" id="profileRole">Employee</div></div>
+        <div id="activeRoleWrap" class="role-switch hidden"><label for="activeRoleSelect">Use role</label><select id="activeRoleSelect" aria-label="Active role"></select></div>
         <button class="secondary" id="logoutButton">Sign out</button>
       </div>
     </header>
@@ -117,7 +123,7 @@
         <button class="nav-btn hidden" data-page="admin" id="navAdmin"><span class="nav-icon">⚙</span><span>HR administration</span></button>
         <button class="nav-btn" data-page="security"><span class="nav-icon">♙</span><span>Account security</span></button>
         <button class="nav-btn hidden" data-page="audit" id="navAudit"><span class="nav-icon">≡</span><span>Audit history</span></button>
-        <div class="side-bottom">SHIFT CODES<br>G · General<br>A · Day / evening<br>B · Overnight<br>D · Day shift<br>N · Night shift<br>O · Off day</div>
+        <div class="side-bottom">SHIFT CODES AND TIMES<br>G · General — 08:00–17:00 WAT<br>A · Shift A — 08:00–20:00 WAT<br>B · Shift B — 20:00–08:00 WAT (next day)<br>D · Day Shift — 07:00–19:00 WAT<br>N · Night Shift — 19:00–07:00 WAT (next day)<br>O · Off Day — No shift</div>
       </aside>
       <main class="main">
         <div id="mandatorySecurity" class="hidden">
@@ -135,7 +141,8 @@
               <div class="metric"><div class="metric-label">OPEN SWAP REQUESTS</div><div class="metric-value" id="metricSwaps">—</div><div class="metric-note">Requests requiring an action or decision</div></div>
             </div>
             <div class="card">
-              <div class="card-head"><div><h2>14-day roster</h2><p>Your roster, or the employees assigned under your SIC / manager responsibility.</p></div><button class="secondary" id="refreshButton">Refresh</button></div>
+              <div class="card-head"><div><h2>Shift roster</h2><p>Your roster and the employees visible under your selected role.</p></div><button class="secondary" id="refreshButton">Refresh</button></div>
+              <div class="roster-controls" style="margin-bottom:14px"><div class="field"><label for="rosterStartDate">Start date</label><input type="date" id="rosterStartDate" required></div><div class="field"><label for="rosterEndDate">End date</label><input type="date" id="rosterEndDate" required></div><button type="button" id="applyRosterRangeButton">Apply date range</button></div>
               <div id="rosterTable"><div class="loading">Loading roster…</div></div>
             </div>
             <div class="footer-note">Roster patterns repeat until changed. One-day changes and approved swaps do not alter the recurring pattern.</div>
@@ -147,7 +154,7 @@
               <div class="card col-6">
                 <div class="card-head"><div><h2>Schedule a shift</h2><p>New schedules must begin after today.</p></div><span class="pill">SIC / HR</span></div>
                 <form id="scheduleForm">
-                  <div class="field"><label for="scheduleEmployees">Employees / group</label><select id="scheduleEmployees" multiple size="7" required></select><div class="help">Select one or more employees. Use Ctrl or Command to select multiple entries.</div></div>
+                  <div class="field"><label for="scheduleEmployees">Employees / group</label><input class="employee-search" type="search" data-filter-target="scheduleEmployees" placeholder="Type employee name or ID to filter"><select id="scheduleEmployees" multiple size="7" required></select><div class="help">Select one or more employees. Use Ctrl or Command to select multiple entries.</div></div>
                   <div class="field"><label for="schedulePattern">Shift pattern</label><select id="schedulePattern" required></select></div>
                   <div class="field"><label for="scheduleStart">Effective start date</label><input type="date" id="scheduleStart" required></div>
                   <div class="field"><label for="scheduleNotes">Notes (optional)</label><input id="scheduleNotes" placeholder="Operational reason or group name"></div>
@@ -157,14 +164,14 @@
               <div class="card col-6">
                 <div class="card-head"><div><h2>Change a shift</h2><p>Effective today or later. Past dates are blocked.</p></div><span class="pill">SIC / HR</span></div>
                 <form id="changeForm">
-                  <div class="field"><label for="changeEmployees">Employees</label><select id="changeEmployees" multiple size="5" required></select></div>
+                  <div class="field"><label for="changeEmployees">Employees</label><input class="employee-search" type="search" data-filter-target="changeEmployees" placeholder="Type employee name or ID to filter"><select id="changeEmployees" multiple size="5" required></select></div>
                   <div class="field"><label for="changeMode">Change type</label><select id="changeMode"><option value="pattern">Change recurring pattern</option><option value="dates">Change selected date(s)</option></select></div>
                   <div id="patternChangeFields">
                     <div class="field"><label for="changePattern">New shift pattern</label><select id="changePattern"></select></div>
                     <div class="field"><label for="changeEffective">Effective date</label><input type="date" id="changeEffective"></div>
                   </div>
                   <div id="dateChangeFields" class="hidden">
-                    <div class="field"><label for="dateEntries">Date and replacement shift</label><textarea id="dateEntries" placeholder="One entry per line, e.g. 2026-10-27,A&#10;2026-10-28,O"></textarea><div class="help">Enter one date and shift code per line: YYYY-MM-DD,SHIFT. Codes: G, A, B, D, N, O.</div></div>
+                    <div class="date-shift-builder"><div class="field"><label for="dateEntryDate">Calendar date</label><input type="date" id="dateEntryDate"></div><div class="field"><label for="dateEntryShift">Replacement shift</label><select id="dateEntryShift"></select></div><div class="field"><label>&nbsp;</label><button type="button" id="addDateEntryButton">Add date + shift</button></div></div><div class="field" style="margin-top:12px"><label for="dateEntries">Selected date(s) and replacement shift(s)</label><textarea id="dateEntries" placeholder="Use the calendar and shift selector, then click Add date + shift. One entry is added per line."></textarea><div class="help">Repeat the calendar/shift selection and Add action until all dates are listed. You may edit the list before saving. Date changes do not alter the recurring pattern on other dates.</div></div>
                   </div>
                   <div class="field"><label for="changeReason">Reason / comment</label><input id="changeReason" placeholder="Operational exigency"></div>
                   <div class="actions"><button type="submit">Save shift change</button></div>
@@ -179,7 +186,7 @@
               <div class="card col-5">
                 <div class="card-head"><div><h2>Request a shift swap</h2><p>Choose an eligible colleague and date.</p></div></div>
                 <form id="swapForm">
-                  <div class="field"><label for="swapPartner">Colleague</label><select id="swapPartner" required></select><div id="swapPartnerHelp" class="help"></div></div>
+                  <div class="field"><label for="swapPartner">Colleague</label><input class="employee-search" type="search" data-filter-target="swapPartner" placeholder="Type employee name or ID to filter"><select id="swapPartner" required></select><div id="swapPartnerHelp" class="help"></div></div>
                   <div class="field"><label for="swapDate">Shift date</label><input type="date" id="swapDate" required></div>
                   <div class="field"><label for="swapComment">Comment (optional)</label><textarea id="swapComment" placeholder="Reason for requested swap"></textarea></div>
                   <div class="actions"><button type="submit">Send swap request</button></div>
@@ -200,7 +207,7 @@
               <div class="card col-6">
                 <div class="card-head"><div><h2>Assign employee roles</h2><p>Roles can be combined, e.g. SIC + L1 Manager.</p></div></div>
                 <form id="rolesForm">
-                  <div class="field"><label for="adminEmployee">Employee</label><select id="adminEmployee" required></select></div>
+                  <div class="field"><label for="adminEmployee">Employee</label><input class="employee-search" type="search" data-filter-target="adminEmployee" placeholder="Type employee name or ID to filter"><select id="adminEmployee" required></select></div>
                   <div class="field"><label>Roles</label>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                       <label><input type="checkbox" class="roleCheckbox" value="Employee" checked style="width:auto;margin-right:5px">Employee</label>
@@ -213,11 +220,21 @@
                 </form>
                 <div class="rule"></div>
                 <form id="provisionForm">
-                  <h3>Provision account</h3>
-                  <div class="field"><label for="provisionEmployee">Employee</label><select id="provisionEmployee" required></select></div>
-                  <div class="field"><label for="temporaryPassword">Temporary password</label><input type="password" id="temporaryPassword" minlength="10" required placeholder="At least 10 characters; include a number"><div class="help">The employee must change it at first login.</div></div>
-                  <div class="actions"><button type="submit">Set temporary password</button></div>
+                  <h3>Reset employee password</h3>
+                  <div class="field"><label for="provisionEmployee">Employee</label><input class="employee-search" type="search" data-filter-target="provisionEmployee" placeholder="Type employee name or ID to filter"><select id="provisionEmployee" required></select></div>
+                  <div class="help">Resetting sets the standard temporary password configured by the Apps Script administrator and clears the old recovery question. The employee must create a new password at next sign-in.</div>
+                  <div class="actions"><button type="submit">Reset password</button></div>
                 </form>
+                <div class="rule"></div><div class="field"><label>Bulk account reset</label><p class="help">Reset every employee account to the standard temporary password. This signs out existing sessions and requires each employee to set a new password and recovery question.</p><button type="button" class="danger" id="resetAllPasswordsButton">Reset all employee passwords</button></div>
+              </div>
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Export employee shift roster</h2><p>Export all employees and shift codes for a selected date range.</p></div></div>
+                <form id="exportForm">
+                  <div class="form-grid"><div class="field"><label for="exportStartDate">Start date</label><input type="date" id="exportStartDate" required></div><div class="field"><label for="exportEndDate">End date</label><input type="date" id="exportEndDate" required></div></div>
+                  <div class="help">Unassigned weekdays default to G; unassigned Saturdays and Sundays default to O. Shift Type is S if any A, B, D or N occurs in the selected range; otherwise it is G.</div>
+                  <div class="actions"><button type="submit" id="exportButton">Generate and download CSV</button></div>
+                </form>
+                <div id="exportResult" class="inline-note" style="margin-top:13px"></div>
               </div>
               <div class="card col-6">
                 <div class="card-head"><div><h2>Bulk shift import</h2><p>CSV overrides are allowed for past, current, and future dates.</p></div></div>
@@ -238,9 +255,9 @@
               <div class="card col-6">
                 <h2>Change password</h2><p class="muted small">Use at least 10 characters and include a letter and a number.</p>
                 <form id="passwordForm">
-                  <div class="field"><label for="currentPassword">Current password</label><input type="password" id="currentPassword" required autocomplete="current-password"></div>
-                  <div class="field"><label for="newPassword">New password</label><input type="password" id="newPassword" required autocomplete="new-password"></div>
-                  <div class="field"><label for="confirmPassword">Confirm new password</label><input type="password" id="confirmPassword" required autocomplete="new-password"></div>
+                  <div class="field"><label for="currentPassword">Current password</label><div class="password-control"><input type="password" id="currentPassword" required autocomplete="current-password"><button type="button" class="secondary" data-toggle-password="currentPassword">Show</button></div></div>
+                  <div class="field"><label for="newPassword">New password</label><div class="password-control"><input type="password" id="newPassword" required autocomplete="new-password"><button type="button" class="secondary" data-toggle-password="newPassword">Show</button></div></div>
+                  <div class="field"><label for="confirmPassword">Confirm new password</label><div class="password-control"><input type="password" id="confirmPassword" required autocomplete="new-password"><button type="button" class="secondary" data-toggle-password="confirmPassword">Show</button></div></div>
                   <div class="actions"><button type="submit">Change password</button></div>
                 </form>
               </div>
@@ -332,7 +349,7 @@
     api("getInitialData",[token],function(data){
       initData=data;user=data.employee;
       showApp();$("mandatorySecurity").classList.add("hidden");$("normalPages").classList.remove("hidden");
-      $("profileName").textContent=user.name||user.empId;$("profileRole").textContent=(user.roles||[]).join(" · ");
+      $("profileName").textContent=user.name||user.empId;
       $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
       $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
       $("todayChip").textContent="Today · "+data.today;
@@ -352,7 +369,7 @@
     $("mandatorySecurityForm").innerHTML=
       '<div class="card" style="max-width:760px">'+
       '<form id="mandatoryForm">'+
-      (forcePassword?'<div class="field"><label for="mandatoryNewPassword">New password</label><input id="mandatoryNewPassword" type="password" minlength="10" required autocomplete="new-password"></div>':'')+
+      (forcePassword?'<div class="field"><label for="mandatoryNewPassword">New password</label><div class="password-control"><input id="mandatoryNewPassword" type="password" minlength="10" required autocomplete="new-password"><button type="button" class="secondary" data-toggle-password="mandatoryNewPassword">Show</button></div></div><div class="field"><label for="mandatoryConfirmPassword">Confirm new password</label><div class="password-control"><input id="mandatoryConfirmPassword" type="password" minlength="10" required autocomplete="new-password"><button type="button" class="secondary" data-toggle-password="mandatoryConfirmPassword">Show</button></div></div>':'')+
       '<div class="field"><label for="mandatoryQuestion">Recovery question</label><input id="mandatoryQuestion" minlength="8" required placeholder="A question only you can answer"></div>'+
       '<div class="field"><label for="mandatoryAnswer">Recovery answer</label><input id="mandatoryAnswer" minlength="3" required autocomplete="off"></div>'+
       (forcePassword?'':'<div class="field"><label for="mandatoryCurrentPassword">Current password</label><input id="mandatoryCurrentPassword" type="password" required></div>')+
@@ -364,6 +381,7 @@
       var answer=$("mandatoryAnswer").value;
       if(forcePassword){
         var newPass=$("mandatoryNewPassword").value;
+        if(newPass!==$("mandatoryConfirmPassword").value){toast("New password and confirmation do not match.","error");return;}
         api("changeMyPassword",[token,"",newPass,question,answer],function(resp){
           token=resp.token;sessionStorage.setItem("shiftMgmtToken",token);
           temporaryPasswordRequired=false;recoveryRequired=false;toast(resp.message,"success");
@@ -392,12 +410,22 @@
     if(page==="audit")loadAudit();
   }
   function configureForms(){
+    var roles=initData.roles||[];
+    $("activeRoleWrap").classList.toggle("hidden",roles.length<2);
+    $("activeRoleSelect").innerHTML=roles.map(function(role){return '<option value="'+esc(role)+'">'+esc(role)+'</option>';}).join("");
+    $("activeRoleSelect").value=initData.activeRole||roles[0]||"";
+    $("profileRole").textContent="Active role: "+(initData.activeRole||roles[0]||"Employee");
     var patterns=initData.patterns||[];
     ["schedulePattern","changePattern"].forEach(function(id){
       $(id).innerHTML=patterns.map(function(p){return '<option value="'+esc(p.name)+'">'+esc(p.name)+' — '+esc(p.sequence)+'</option>';}).join("");
     });
     var team=initData.team||[];
     var options=team.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';}).join("");
+    var shifts=initData.shifts||[];
+    $("dateEntryShift").innerHTML='<option value="">Select shift…</option>'+shifts.map(function(s){
+      var timing=s.in?(s.in+"–"+s.out+" WAT"):"No shift hours";
+      return '<option value="'+esc(s.code)+'">'+esc(s.code+" · "+s.label+" — "+timing)+'</option>';
+    }).join("");
     $("scheduleEmployees").innerHTML=options;
     $("changeEmployees").innerHTML=options;
     var partners=initData.swapPartners||[];
@@ -405,22 +433,45 @@
       return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';
     }).join("");
     $("swapPartnerHelp").textContent=partners.length?"Eligible colleagues: "+partners.length:"No eligible partners found. Check the SIC and L1 Manager columns in Emp_List.";
-    ["scheduleStart","changeEffective","swapDate"].forEach(function(id){$(id).min=initData.today;});
     $("scheduleStart").min=nextDate(initData.today);
+    $("changeEffective").min=initData.activeRole==="HR"?"":initData.today;
+    $("dateEntryDate").min=initData.activeRole==="HR"?"":initData.today;
+    $("dateEntryDate").value=initData.today;
+    $("swapDate").min=initData.today;
+    $("rosterStartDate").value=initData.monthStart;
+    $("rosterEndDate").value=initData.monthEnd;
+    $("exportStartDate").value=initData.monthStart;
+    $("exportEndDate").value=initData.monthEnd;
+    applyEmployeeFilters();
     if(initData.isHr){
       api("getAdminEmployeeList",[token],function(list){
         var allOptions=list.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+') · '+esc(e.role||'Employee')+'</option>';}).join("");
         $("adminEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
         $("provisionEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
+        applyEmployeeFilters();
       });
     }
+  }
+  function applyEmployeeFilters(){
+    document.querySelectorAll(".employee-search[data-filter-target]").forEach(function(input){filterEmployeeSelect(input);});
+  }
+  function filterEmployeeSelect(input){
+    var target=$(input.dataset.filterTarget);if(!target)return;
+    var term=String(input.value||"").trim().toLowerCase();
+    Array.from(target.options).forEach(function(option){
+      if(!option.value){option.hidden=false;return;}
+      option.hidden=option.textContent.toLowerCase().indexOf(term)<0;
+    });
   }
   function nextDate(iso){
     var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+1);
     return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   }
   function loadDashboard(){
-    api("getDashboardData",[token],function(data){
+    var start=$("rosterStartDate").value||initData.monthStart;
+    var end=$("rosterEndDate").value||initData.monthEnd;
+    if(start>end){toast("End date must be on or after start date.","error");return;}
+    api("getDashboardData",[token,start,end],function(data){
       dashboard=data;
       $("metricShift").textContent=data.currentShift;
       var shift=(initData.shifts||[]).find(function(s){return s.code===data.currentShift;});
@@ -449,6 +500,9 @@
   }
   function selectedValues(id){
     return Array.from($(id).selectedOptions).map(function(o){return o.value;}).filter(Boolean);
+  }
+  function csvEscape(value){
+    return '"'+String(value===null||value===undefined?"":value).replace(/"/g,'""')+'"';
   }
   function loadSwaps(){
     api("getMySwapRequests",[token],function(requests){renderSwaps(requests);});
@@ -505,6 +559,7 @@
     },$("getQuestionButton"));
   });
   $("resetPasswordButton").addEventListener("click",function(){
+    if($("resetNewPassword").value!==$("resetConfirmPassword").value){toast("New password and confirmation do not match.","error");return;}
     api("resetPasswordWithSecret",[$("resetIdentity").value,$("resetAnswer").value,$("resetNewPassword").value],function(result){
       toast(result.message,"success");$("forgotPanel").classList.add("hidden");$("forgotLink").classList.remove("hidden");
       $("identity").value=$("resetIdentity").value;$("loginPassword").value="";
@@ -516,8 +571,34 @@
     button.addEventListener("click",function(){showPage(button.dataset.page);});
   });
   $("refreshButton").addEventListener("click",function(){loadDashboard();},false);
+  $("applyRosterRangeButton").addEventListener("click",function(){loadDashboard();});
+  $("activeRoleSelect").addEventListener("change",function(){
+    var requested=this.value;
+    api("setActiveRole",[token,requested],function(result){
+      activePage="dashboard";toast("Interface role changed to "+result.activeRole+".","success");loadApplication();
+    });
+  });
+  document.addEventListener("input",function(e){
+    if(e.target&&e.target.matches(".employee-search[data-filter-target]"))filterEmployeeSelect(e.target);
+  });
+  document.addEventListener("click",function(e){
+    var toggle=e.target.closest("button[data-toggle-password]");if(!toggle)return;
+    var input=$(toggle.dataset.togglePassword);if(!input)return;
+    var show=input.type==="password";input.type=show?"text":"password";toggle.textContent=show?"Hide":"Show";
+  });
   $("refreshSwapsButton").addEventListener("click",function(){loadSwaps();},false);
   $("refreshAuditButton").addEventListener("click",function(){loadAudit();},false);
+  $("addDateEntryButton").addEventListener("click",function(){
+    var date=$("dateEntryDate").value;var shift=$("dateEntryShift").value;
+    if(!date||!shift){toast("Select both a calendar date and a replacement shift.","error");return;}
+    var lines=$("dateEntries").value.split(/\r?\n/).map(function(line){return line.trim();}).filter(Boolean);
+    var existing=lines.findIndex(function(line){return line.split(",")[0].trim()===date;});
+    var entry=date+","+shift;
+    if(existing>=0){lines[existing]=entry;toast("Updated the selected shift for "+date+".","success");}
+    else{lines.push(entry);toast("Added "+date+" → "+shift+".","success");}
+    $("dateEntries").value=lines.join("\n");
+    $("dateEntryDate").value="";$("dateEntryShift").value="";
+  });
   $("changeMode").addEventListener("change",function(){
     var pattern=this.value==="pattern";
     $("patternChangeFields").classList.toggle("hidden",!pattern);
@@ -566,8 +647,28 @@
   });
   $("provisionForm").addEventListener("submit",function(e){
     e.preventDefault();
-    api("adminProvisionAccount",[token,$("provisionEmployee").value,$("temporaryPassword").value],function(result){
-      toast(result.message,"success");$("temporaryPassword").value="";
+    if(!$("provisionEmployee").value){toast("Select an employee to reset.","error");return;}
+    api("adminResetEmployeePassword",[token,$("provisionEmployee").value],function(result){toast(result.message,"success");},e.submitter);
+  });
+  $("resetAllPasswordsButton").addEventListener("click",function(){
+    var confirmation=window.prompt("This resets every employee account and clears recovery questions. Type RESET ALL to continue.");
+    if(confirmation===null)return;
+    api("adminResetAllPasswordsToTemporary",[token,confirmation],function(result){toast(result.message,"success");},this);
+  });
+  $("exportForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var start=$("exportStartDate").value;var end=$("exportEndDate").value;
+    if(!start||!end||start>end){toast("Choose a valid start and end date.","error");return;}
+    api("exportShiftRoster",[token,start,end],function(result){
+      var all=[result.headers].concat(result.rows);
+      var csv=all.map(function(row){return row.map(csvEscape).join(",");}).join("\r\n");
+      var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+      var url=URL.createObjectURL(blob);var link=document.createElement("a");
+      link.href=url;link.download="Employee_Shift_Roster_"+result.fromDate+"_to_"+result.toDate+".csv";
+      document.body.appendChild(link);link.click();link.remove();
+      window.setTimeout(function(){URL.revokeObjectURL(url);},1000);
+      $("exportResult").textContent="Exported "+result.count+" employees from "+result.fromDate+" to "+result.toDate+".";
+      toast("Shift roster export generated.","success");
     },e.submitter);
   });
   $("csvFile").addEventListener("change",function(){
@@ -606,7 +707,7 @@
     if(!token){showLogin();return;}
     api("getInitialData",[token],function(result){
       initData=result;user=result.employee;showApp();$("normalPages").classList.remove("hidden");$("mandatorySecurity").classList.add("hidden");
-      $("profileName").textContent=user.name||user.empId;$("profileRole").textContent=(user.roles||[]).join(" · ");
+      $("profileName").textContent=user.name||user.empId;
       $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
       $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
       $("todayChip").textContent="Today · "+result.today;
