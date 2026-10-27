@@ -3,6 +3,7 @@
  */
 function doGet(e) {
   var approvalToken = e && e.parameter ? String(e.parameter.approvalToken || "") : "";
+  if (!/^[a-f0-9]{64}$/i.test(approvalToken)) approvalToken = "";
   if (approvalToken) {
     var template = HtmlService.createTemplateFromFile("EmailApproval");
     template.approvalToken = approvalToken;
