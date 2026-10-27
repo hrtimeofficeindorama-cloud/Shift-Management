@@ -7,22 +7,25 @@ function doGet() {
     .addMetaTag("viewport", "width=device-width, initial-scale=1");
 }
 
-function getDashboardData(token) {
+function getDashboardData(token, fromDate, toDate) {
   var ctx = requireFullSession_(token);
   var today = todayISO_();
-  var end = datePlusDays_(today, 13);
+  var defaults = currentMonthRange_();
+  var start = fromDate || defaults.start;
+  var end = toDate || defaults.end;
+  var roster = getRosterData(token, start, end);
   return {
     employee: publicEmployee_(ctx.employee),
-    today: today,
+    today: today, rosterFrom: start, rosterTo: end,
     currentShift: getShiftForDate_(ctx.empId, today) || "Not scheduled",
-    roster: getRosterData(token, today, end),
+    roster: roster,
     swaps: getMySwapRequests(token)
   };
 }
 
 function getAuditRows(token, limit) {
   var ctx = requireFullSession_(token);
-  requireRole_(ctx.employee, "HR");
+  requireActiveRole_(ctx, "HR");
   var rows = getTableRows_(SHIFT_APP_CONFIG.TABLES.AUDIT);
   rows.sort(function(a, b) {
     var da = a.Timestamp instanceof Date ? a.Timestamp.getTime() : 0;

@@ -6,16 +6,18 @@ function getInitialData(token) {
   var actor = ctx.employee;
   var employees = getEmployees_();
   var roles = getRoles_(actor);
-  var team = hasRole_(actor, "HR") ? employees : getDownliners_(actor, employees);
-  var canSchedule = hasRole_(actor, "HR") || hasRole_(actor, "SIC");
+  var team = getTeamForActiveRole_(actor, employees, ctx.activeRole);
+  var canSchedule = ctx.activeRole === "HR" || ctx.activeRole === "SIC";
   return {
-    employee: publicEmployee_(actor), roles: roles,
-    isHr: hasRole_(actor, "HR"), canSchedule: canSchedule,
+    employee: publicEmployee_(actor), roles: roles, activeRole: ctx.activeRole,
+    isHr: ctx.activeRole === "HR", canSchedule: canSchedule,
     canViewTeam: team.length > 0 || hasRole_(actor, "HR"),
-    canBulkImport: hasRole_(actor, "HR"),
+    canBulkImport: ctx.activeRole === "HR",
     patterns: Object.keys(SHIFT_APP_CONFIG.PATTERNS).map(function(name) {
       return { name: name, sequence: SHIFT_APP_CONFIG.PATTERNS[name] };
     }),
+    monthStart: currentMonthRange_().start,
+    monthEnd: currentMonthRange_().end,
     shifts: Object.keys(SHIFT_APP_CONFIG.SHIFT_CODES).map(function(code) {
       return { code: code, label: SHIFT_APP_CONFIG.SHIFT_CODES[code].label, in: SHIFT_APP_CONFIG.SHIFT_CODES[code].in, out: SHIFT_APP_CONFIG.SHIFT_CODES[code].out };
     }),
@@ -30,11 +32,8 @@ function getRosterData(token, fromDate, toDate) {
   var dates = datesForRange_(fromDate, toDate);
   var employees = getEmployees_();
   var actor = ctx.employee;
-  var allowed;
-  var directReports = getDownliners_(actor, employees);
-  if (hasRole_(actor, "HR")) allowed = employees;
-  else if (hasRole_(actor, "SIC") || hasRole_(actor, "L1 Manager") || directReports.length) allowed = [actor].concat(directReports);
-  else allowed = [actor];
+  var allowed = ctx.activeRole === "HR" ? employees : getTeamForActiveRole_(actor, employees, ctx.activeRole);
+  if (!allowed.length) allowed = [actor];
   return createRosterGrid_(allowed, dates[0], dates[dates.length - 1]);
 }
 
@@ -55,7 +54,7 @@ function getEmployeeRoster(token, empId, fromDate, toDate) {
 function createShiftSchedule(token, request) {
   var ctx = requireFullSession_(token);
   request = request || {};
-  requireRole_(ctx.employee, ["HR", "SIC"]);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC"]);
   var startISO = isoDate_(parseIsoDate_(request.startDate));
   if (startISO <= todayISO_()) throw new Error("A new shift schedule must start after today.");
   var patternName = String(request.patternName || "");
@@ -65,7 +64,7 @@ function createShiftSchedule(token, request) {
   var employees = ids.map(function(id) {
     var emp = findEmployeeById_(id);
     if (!emp) throw new Error("Employee not found: " + id);
-    if (!canManageEmployee_(ctx.employee, emp)) throw new Error("You cannot schedule shifts for " + id + ".");
+    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot schedule shifts for " + id + " under your active role.");
     return emp;
   });
   var groupId = Utilities.getUuid();
@@ -92,19 +91,19 @@ function createShiftSchedule(token, request) {
 function createShiftChange(token, request) {
   var ctx = requireFullSession_(token);
   request = request || {};
-  requireRole_(ctx.employee, ["HR", "SIC"]);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC"]);
   var mode = String(request.mode || "");
   var ids = normalizeEmployeeIds_(request.employeeIds);
   if (!ids.length) throw new Error("Select at least one employee.");
   var employees = ids.map(function(id) {
     var emp = findEmployeeById_(id);
     if (!emp) throw new Error("Employee not found: " + id);
-    if (!canManageEmployee_(ctx.employee, emp)) throw new Error("You cannot change shifts for " + id + ".");
+    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot change shifts for " + id + " under your active role.");
     return emp;
   });
   if (mode === "pattern") {
     var effective = isoDate_(parseIsoDate_(request.effectiveDate));
-    if (effective < todayISO_()) throw new Error("Shift changes cannot be effective in the past.");
+    if (ctx.activeRole !== "HR" && effective < todayISO_()) throw new Error("Shift changes cannot be effective in the past. Switch to HR to make a historical correction.");
     var patternName = String(request.patternName || "");
     if (!SHIFT_APP_CONFIG.PATTERNS[patternName]) throw new Error("Select a valid shift pattern.");
     var groupId = Utilities.getUuid();
@@ -130,11 +129,14 @@ function createShiftChange(token, request) {
   var entries = Array.isArray(request.entries) ? request.entries : [];
   if (!entries.length) throw new Error("Add at least one shift date and replacement code.");
   var validCodes = Object.keys(SHIFT_APP_CONFIG.SHIFT_CODES);
+  var seenDates = {};
   var overrides = [];
   var oldValues = [];
   entries.forEach(function(entry) {
     var date = isoDate_(parseIsoDate_(entry.date));
-    if (date < todayISO_()) throw new Error("Shift changes cannot affect past dates: " + date);
+    if (ctx.activeRole !== "HR" && date < todayISO_()) throw new Error("Shift changes cannot affect past dates: " + date + ". Switch to HR to make a historical correction.");
+    if (seenDates[date]) throw new Error("The date " + date + " appears more than once. Keep one replacement shift per date.");
+    seenDates[date] = true;
     var code = String(entry.shiftCode || "").trim().toUpperCase();
     if (validCodes.indexOf(code) === -1) throw new Error("Invalid shift code: " + code);
     employees.forEach(function(emp) {
@@ -189,7 +191,7 @@ function normalizeEmployeeIds_(ids) {
 
 function bulkImportShifts(token, csvText) {
   var ctx = requireFullSession_(token);
-  requireRole_(ctx.employee, "HR");
+  requireActiveRole_(ctx, "HR");
   var text = String(csvText || "").trim();
   if (!text) throw new Error("Choose a CSV file or paste its contents.");
   var rows = Utilities.parseCsv(text);
@@ -279,4 +281,67 @@ function parseImportDate_(value) {
 function csvEscape_(value) {
   var text = String(value === null || value === undefined ? "" : value);
   return '"' + text.replace(/"/g, '""') + '"';
+}
+
+/** Role-aware employee visibility: SIC and L1 Manager use their respective hierarchy columns. */
+function getTeamForActiveRole_(actor, employees, activeRole) {
+  if (activeRole === "HR") return employees;
+  if (activeRole === "SIC") return [actor].concat(employees.filter(function(candidate) {
+    return employeeId_(candidate) !== employeeId_(actor) && isAssignedSicTo_(candidate, actor);
+  }));
+  if (activeRole === "L1 Manager") return [actor].concat(employees.filter(function(candidate) {
+    return employeeId_(candidate) !== employeeId_(actor) && fieldReferencesEmployee_(
+      getEmpValue_(candidate, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), actor);
+  }));
+  var reports = getDownliners_(actor, employees);
+  return reports.length ? [actor].concat(reports) : [actor];
+}
+
+function requireActiveRoleOneOf_(ctx, roles) {
+  if (!ctx || roles.indexOf(ctx.activeRole) < 0) {
+    throw new Error("Switch to one of these roles to perform this action: " + roles.join(", ") + ".");
+  }
+  if (getRoles_(ctx.employee).indexOf(ctx.activeRole) < 0) throw new Error("The active role is not assigned to your account.");
+}
+
+/** Returns a flat export matrix for HR to download as CSV. */
+function exportShiftRoster(token, fromDate, toDate) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  var defaults = currentMonthRange_();
+  var start = isoDate_(parseIsoDate_(fromDate || defaults.start));
+  var end = isoDate_(parseIsoDate_(toDate || defaults.end));
+  var dates = datesForRange_(start, end);
+  var employees = getEmployees_().slice().sort(function(a, b) {
+    return employeeId_(a).localeCompare(employeeId_(b), undefined, {numeric:true});
+  });
+  var headers = ["Emp ID", "Shift Type"].concat(dates);
+  var rows = employees.map(function(emp) {
+    var codes = dates.map(function(date) {
+      var code = getShiftForDate_(employeeId_(emp), date);
+      if (code) return code;
+      var day = parseIsoDate_(date).getDay();
+      return day === 0 || day === 6 ? "O" : "G";
+    });
+    var shiftType = codes.some(function(code) { return ["D", "N", "A", "B"].indexOf(code) >= 0; }) ? "S" : "G";
+    return [employeeId_(emp), shiftType].concat(codes);
+  });
+  addAudit_(ctx.empId, "SHIFT_ROSTER_EXPORTED", employees.map(employeeId_), [start, end], "", "",
+    "Exported " + employees.length + " employees across " + dates.length + " day(s)", "Success");
+  return { headers: headers, rows: rows, fromDate: start, toDate: end, count: rows.length };
+}
+
+function currentMonthRange_() {
+  var today = parseIsoDate_(todayISO_());
+  var start = isoDate_(new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0));
+  var end = isoDate_(new Date(today.getFullYear(), today.getMonth() + 1, 0, 12, 0, 0));
+  return { start: start, end: end };
+}
+
+
+function canManageEmployeeForActiveRole_(ctx, target) {
+  if (!ctx || !target) return false;
+  if (ctx.activeRole === "HR") return hasRole_(ctx.employee, "HR");
+  if (ctx.activeRole === "SIC") return hasRole_(ctx.employee, "SIC") && (employeeId_(target) === ctx.empId || isAssignedSicTo_(target, ctx.employee));
+  return false;
 }

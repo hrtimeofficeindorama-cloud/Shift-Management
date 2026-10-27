@@ -6,12 +6,16 @@ This project adds a Google Apps Script web application to the existing Shift-Man
 
 - Employee login by employee ID, official email, personal email, or matching name.
 - Salted, iteratively hashed passwords and secret answers; temporary-password enforcement; password change and secret-question password recovery.
-- HR role assignment for Employee, SIC, L1 Manager, and HR (Super Admin).
+- HR role assignment for Employee, SIC, L1 Manager, and HR (Super Admin), with a top-bar active-role selector for multi-role accounts.
+- Role-specific downline rosters for SIC and L1 Manager users; searchable employee selectors by name or ID.
 - SIC-authorised future shift schedules; group assignments; named repeating patterns.
 - Pattern changes effective today or later; single-date overrides effective today or later.
 - One-day shift swaps: requester, selected colleague, then required SIC and L1 Manager approvals. Roster is changed only after all approvals; original recurring patterns resume on following dates.
 - HR bulk CSV import that can overwrite past, current, and future roster dates and returns row validation errors.
-- Team/self roster views, email notifications, and audit trail.
+- Team/self roster views with selectable start/end dates (defaulting to the current month), email notifications, and audit trail.
+- Calendar-and-shift selectors for multi-date corrections; HR can correct roster dates in the past or future.
+- HR CSV export by date range with Emp ID, Shift Type, and one column per date. Unassigned weekdays default to G; weekends default to O. Shift Type is S if any A, B, D or N occurs in the period, otherwise G.
+- HR can reset a single employee or all employee accounts to the standard temporary password; affected employees must set a new password and recovery question.
 
 ## Spreadsheet
 
@@ -59,9 +63,11 @@ The current Code.gs CSV sync preserves extra columns, but verify that the source
 5. In Apps Script, create or update the Web App deployment. Execute as the script owner and set access according to company policy. A GitHub clasp push alone does not create or update a Web App deployment.
 6. Confirm MailApp email sending works for the deployment owner. Notifications are sent to the employee's first usable official/personal email address. If no email exists, the roster still saves but email cannot be sent.
 
-### Provisioning employees
+### Standard temporary password and account reset
 
-After signing in as HR, use Admin → Provision account to set a temporary password. Communicate it securely to the employee. The employee must change it and configure a recovery question/answer on first login.
+The repository is public, so the temporary credential is deliberately not hard-coded into committed source. In Apps Script Project Settings → Script Properties, set `SHIFT_TEMP_PASSWORD` to the approved standard temporary password before using HR password-reset actions. Do not store the password in this repository, code comments, or documentation. Keep the Apps Script project and employee spreadsheet access restricted. The server validates that this property meets the password policy.
+
+After signing in as HR and switching to the HR role, use HR administration → Reset employee password to reset one employee, or use Reset all employee passwords for a bulk reset. The bulk action requires typing `RESET ALL`. Both actions clear the recovery question/answer and invalidate existing sessions. All affected employees must choose a new password and set a recovery question at their next sign-in. Communicate the temporary password to employees using an approved secure channel.
 
 ### Bulk CSV format
 
@@ -87,6 +93,9 @@ Accepted dates: YYYY-MM-DD or M/D/YYYY. HR import allows past/current/future dat
 - HR bulk import may override past, present, and future dates.
 
 ## Security notes and remaining configuration
+
+- The active-role selector changes the interface scope only among roles already assigned to the signed-in employee. Server-side checks still validate role assignment and employee hierarchy.
+- Roster view and export date ranges support up to 366 calendar days. Very large date ranges with many employees may produce wide exports.
 
 - Secret questions are a recovery convenience and are weaker than multi-factor recovery. Use non-obvious answers and restrict web-app access to the workforce.
 - Protect the employee spreadsheet and Apps Script project with company-controlled access. Do not share the bootstrap key or temporary passwords in public channels.

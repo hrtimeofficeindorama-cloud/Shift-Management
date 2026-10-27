@@ -68,9 +68,9 @@ function getMySwapRequests(token) {
     var mgrIds = splitIds_(rec["Manager Approver IDs"]);
     var sicDec = parseJsonObject_(rec["SIC Decisions JSON"]);
     var mgrDec = parseJsonObject_(rec["Manager Decisions JSON"]);
-    var isSicApprover = sicIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "SIC");
-    var isManagerApprover = mgrIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "L1 Manager");
-    if (!isRequester && !isPartner && !isSicApprover && !isManagerApprover && !hasRole_(ctx.employee, "HR")) return;
+    var isSicApprover = ctx.activeRole === "SIC" && sicIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "SIC");
+    var isManagerApprover = ctx.activeRole === "L1 Manager" && mgrIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "L1 Manager");
+    if (!isRequester && !isPartner && !isSicApprover && !isManagerApprover && !(ctx.activeRole === "HR" && hasRole_(ctx.employee, "HR"))) return;
     var reqEmp = findEmployeeById_(requesterId);
     var parEmp = findEmployeeById_(partnerId);
     out.push({
@@ -152,7 +152,7 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
   decision = String(decision || "").toLowerCase();
   if (["SIC", "L1 Manager"].indexOf(approverType) === -1) throw new Error("Invalid approval type.");
   if (decision !== "approve" && decision !== "reject") throw new Error("Choose approve or reject.");
-  requireRole_(ctx.employee, approverType);
+  requireActiveRole_(ctx, approverType);
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
