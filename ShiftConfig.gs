@@ -10,7 +10,8 @@ var SHIFT_APP_CONFIG = {
     ASSIGNMENTS: "Shift_Assignments",
     OVERRIDES: "Shift_Overrides",
     SWAPS: "Shift_Swap_Requests",
-    AUDIT: "Shift_Audit"
+    AUDIT: "Shift_Audit",
+    APPROVAL_LINKS: "Shift_Swap_Approval_Links"
   },
   SHIFT_CODES: {
     G: { label: "General", in: "08:00", out: "17:00" },
