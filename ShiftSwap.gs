@@ -103,6 +103,9 @@ function getMySwapRequests(token) {
 
 function respondToSwapPartner(token, requestId, decision, comment) {
   var ctx = requireFullSession_(token);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   decision = String(decision || "").toLowerCase();
   if (decision !== "accept" && decision !== "decline") throw new Error("Choose accept or decline.");
   var rec = findSwap_(requestId);
@@ -150,6 +153,9 @@ function respondToSwapPartner(token, requestId, decision, comment) {
   addAudit_(ctx.empId, "SHIFT_SWAP_PARTNER_ACCEPTED", [employeeId_(requester), employeeId_(partner)], [normalizeSheetDate_(rec["Shift Date"])],
     "", "", { requestId: requestId, comment: comment || "" }, "Pending Approvals");
   return { success: true, message: "Partner accepted. The request is now with the SIC(s) and L1 Manager(s)." };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function decideSwapApproval(token, requestId, approverType, decision, comment) {
