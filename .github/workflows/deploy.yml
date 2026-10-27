@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - feature/shift-management-ux-export-passwords
 
 jobs:
   deploy:
