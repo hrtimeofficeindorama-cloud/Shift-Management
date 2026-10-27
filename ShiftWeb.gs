@@ -2,9 +2,10 @@
  * Web app entry point and dashboard aggregation.
  */
 function doGet(e) {
-  var approvalToken = e && e.parameter ? String(e.parameter.approvalToken || "") : "";
-  if (!/^[a-f0-9]{64}$/i.test(approvalToken)) approvalToken = "";
-  if (approvalToken) {
+  var hasApprovalParam = !!(e && e.parameter && Object.prototype.hasOwnProperty.call(e.parameter, "approvalToken"));
+  if (hasApprovalParam) {
+    var approvalToken = String(e.parameter.approvalToken || "");
+    if (!/^[a-f0-9]{64}$/i.test(approvalToken)) approvalToken = "";
     var template = HtmlService.createTemplateFromFile("EmailApproval");
     template.approvalToken = approvalToken;
     return template.evaluate()
