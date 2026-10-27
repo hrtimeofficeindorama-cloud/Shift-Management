@@ -24,8 +24,10 @@ var SHIFT_APP_CONFIG = {
     "General": "GGGGGOO",
     "IFL Shift A": "AAOOBBOO",
     "IFL Shift B": "AAAAOOOOBBBBOOOO",
+    "IFL Shift C": "AAAAOOOO",
     "IPL Shift A": "DDNNOOOO",
-    "IPL Shift B": "DDDDOOOONNNNOOOO"
+    "IPL Shift B": "DDDDOOOONNNNOOOO",
+    "IPL Shift C": "DDDDOOOO"
   },
   ROLES: ["Employee", "SIC", "L1 Manager", "HR"]
 };
