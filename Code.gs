@@ -3,7 +3,7 @@ function syncEmployeeRecords() {
   const SPREADSHEET_ID = "1Mzh0H6PQTq6w47fIlMJ6qUL9UT3NvpBvuoBRN_DrSA8";
   const SHEET_NAME = "Emp_List";
 
-***kehinde
+//*kehinde
 
   // Core mapped headers
   const coreHeaders = [
