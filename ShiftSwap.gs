@@ -44,10 +44,10 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
     "Completed At": "",
     "Comments": String(comment || "")
   }]);
-  sendEmployeeNotice_(partner, "Shift swap approval requested",
-    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shift with you on " + date +
+  sendSwapActionNotice_(partner, requestId, "Partner", "Shift swap approval requested",
+    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shifts with you on " + date +
     ". Your shift: " + partnerShift + "; requester shift: " + requesterShift +
-    ". Sign in to Shift Management to accept or decline.");
+    ". Review the request and choose Accept or Decline below.");
   addAudit_(ctx.empId, "SHIFT_SWAP_SUBMITTED", [employeeId_(requester), employeeId_(partner)], [date],
     { requester: requesterShift, partner: partnerShift }, "",
     { requestId: requestId, comment: String(comment || "") }, "Pending Partner");
@@ -134,11 +134,17 @@ function respondToSwapPartner(token, requestId, decision, comment) {
     "SIC Decisions JSON": JSON.stringify(sicDec), "Manager Decisions JSON": JSON.stringify(mgrDec),
     "Comments": appendComment_(rec.Comments, comment)
   });
-  sicIds.concat(mgrIds).filter(function(id, idx, arr) { return arr.indexOf(id) === idx; }).forEach(function(id) {
+  sicIds.forEach(function(id) {
     var approver = findEmployeeById_(id);
-    if (approver) sendEmployeeNotice_(approver, "Shift swap requires approval",
+    if (approver) sendSwapActionNotice_(approver, requestId, "SIC", "Shift swap requires SIC approval",
       employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
-      normalizeSheetDate_(rec["Shift Date"]) + ". Please sign in to review it.");
+      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
+  });
+  mgrIds.forEach(function(id) {
+    var approver = findEmployeeById_(id);
+    if (approver) sendSwapActionNotice_(approver, requestId, "L1 Manager", "Shift swap requires L1 Manager approval",
+      employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
+      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
   });
   sendEmployeeNotice_(requester, "Shift swap accepted by colleague", employeeName_(partner) + " accepted the request. It has been routed to the SIC(s) and L1 Manager(s) for approval.");
   addAudit_(ctx.empId, "SHIFT_SWAP_PARTNER_ACCEPTED", [employeeId_(requester), employeeId_(partner)], [normalizeSheetDate_(rec["Shift Date"])],
