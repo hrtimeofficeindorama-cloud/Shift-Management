@@ -527,6 +527,16 @@
       }).join("")+
       '<span class="selected-count" id="rosterSelectionCount">0 cells selected</span>';
 
+    if(initData.isHr){
+      var hierarchyPeople=(initData.classEmployees||[]).slice().sort(function(a,b){
+        return String(a.empId).localeCompare(String(b.empId),undefined,{numeric:true,sensitivity:"base"});
+      });
+      $("hierarchyEmployee").innerHTML='<option value="">Select employee…</option>'+hierarchyPeople.map(function(e){
+        return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
+      }).join("");
+      $("hierarchyEmployee").value="";
+      syncHierarchySelectors();
+    }
     renderCurrentDownliners();
     applyEmployeeFilters();
     renderGuide();
@@ -541,6 +551,33 @@
         if(activePage==="admin")loadDownlinerRequests();
       });
     }
+  }
+  function hierarchyFieldContains(fieldValue, employee){
+    var identities=[employee&&employee.empId,employee&&employee.name,employee&&employee.officialEmail]
+      .map(normalizeClientIdentity).filter(Boolean);
+    return String(fieldValue||"").split(/[,;|]/).some(function(part){
+      return identities.indexOf(normalizeClientIdentity(part))>=0;
+    });
+  }
+  function syncHierarchySelectors(){
+    if(!initData||!initData.isHr)return;
+    var people=(initData.classEmployees||[]).slice();
+    var targetId=$("hierarchyEmployee").value;
+    var target=people.find(function(e){return String(e.empId)===String(targetId);});
+    var candidates=people.filter(function(e){return String(e.empId)!==String(targetId);});
+    function populate(id,field){
+      var select=$(id);
+      select.innerHTML=candidates.map(function(e){
+        return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
+      }).join("");
+      Array.from(select.options).forEach(function(option){
+        var candidate=people.find(function(e){return String(e.empId)===String(option.value);});
+        option.selected=!!(target&&candidate&&hierarchyFieldContains(target[field]||"",candidate));
+      });
+    }
+    populate("hierarchySics","sic");
+    populate("hierarchyManagers","manager");
+    applyEmployeeFilters();
   }
   function applyEmployeeFilters(){
     document.querySelectorAll(".employee-search[data-filter-target]").forEach(function(input){filterEmployeeSelect(input);});
