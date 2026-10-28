@@ -10,6 +10,7 @@ This project adds a Google Apps Script web application to the existing Shift-Man
 - Role-specific downline rosters for SIC and L1 Manager users; searchable employee selectors by name or ID.
 - Class separation for National, Expat and Contract. Roster, scheduling, HR administration, imports/exports and swap requests are scoped to the selected class; shift swaps are only permitted between employees in the same class.
 - Spreadsheet-style roster editing: select cells, type approved shift codes, paste TSV ranges, copy selected ranges and drag/select multiple cells. The server validates G, A, B, D, N and O codes and permission per employee/class.
+- Employee-only role is read-only for shift cells and can request swaps; users with multiple roles can edit their own shift only after switching to an assigned SIC, L1 Manager or HR role. Employees needing a direct shift change must contact their SIC, L1 Manager or HR.
 - SIC/L1 Manager downliner addition requests routed to HR for approval; approved requests append a second or additional reporting relationship without replacing existing SIC/Manager values. Self-removal only removes the current relationship.
 - Role-aware Platform guide with separate instructions for every role assigned to the user, plus a developer/support contact form.
 - Visible roster and notification dates use DD/MMM/YYYY where rendered as text.
