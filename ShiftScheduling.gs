@@ -305,8 +305,8 @@ function getTeamForActiveRole_(actor, employees, activeRole) {
     return employeeId_(candidate) !== employeeId_(actor) && fieldReferencesEmployee_(
       getEmpValue_(candidate, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), actor);
   }));
-  var reports = getDownliners_(actor, employees);
-  return reports.length ? [actor].concat(reports) : [actor];
+  if (activeRole === "Employee") return [actor];
+  return [actor];
 }
 
 function requireActiveRoleOneOf_(ctx, roles) {
