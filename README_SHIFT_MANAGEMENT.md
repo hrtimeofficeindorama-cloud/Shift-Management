@@ -6,10 +6,16 @@ This project adds a Google Apps Script web application to the existing Shift-Man
 
 - Employee login by employee ID, official email, personal email, or matching name.
 - Salted, iteratively hashed passwords and secret answers; temporary-password enforcement; password change and secret-question password recovery.
-- HR role assignment for Employee, SIC, L1 Manager, and HR (Super Admin), with a top-bar active-role selector for multi-role accounts.
+- HR role assignment for Employee, SIC, L1 Manager, and HR (Super Admin), with top-bar active-role and employee-class selectors.
 - Role-specific downline rosters for SIC and L1 Manager users; searchable employee selectors by name or ID.
-- SIC-authorised future shift schedules; group assignments; named repeating patterns.
-- Pattern changes effective today or later; single-date overrides effective today or later.
+- Class separation for National, Expat and Contract. Roster, scheduling, HR administration, imports/exports and swap requests are scoped to the selected class; shift swaps are only permitted between employees in the same class.
+- Spreadsheet-style roster editing: select cells, type approved shift codes, paste TSV ranges, copy selected ranges and drag/select multiple cells. The server validates G, A, B, D, N and O codes and permission per employee/class.
+- Employee-only role is read-only for shift cells and can request swaps; users with multiple roles can edit their own shift only after switching to an assigned SIC, L1 Manager or HR role. Employees needing a direct shift change must contact their SIC, L1 Manager or HR.
+- SIC/L1 Manager downliner addition requests routed to HR for approval; approved requests append a second or additional reporting relationship without replacing existing SIC/Manager values. Self-removal only removes the current relationship.
+- Role-aware Platform guide with separate instructions for every role assigned to the user, plus a developer/support contact form.
+- Visible roster and notification dates use DD/MMM/YYYY where rendered as text.
+- SIC/L1 Manager/HR-authorised future shift schedules; group assignments; named repeating patterns.
+- Single-date shift changes are made in My roster; recurring pattern changes remain in Schedule & change. HR can correct past dates while SIC/L1 Manager edits are limited to today and the future.
 - One-day shift swaps: requester, selected colleague, then required SIC and L1 Manager approvals. Roster is changed only after all approvals; original recurring patterns resume on following dates.
 - HR bulk CSV import that can overwrite past, current, and future roster dates and returns row validation errors.
 - Team/self roster views with selectable start/end dates (defaulting to the current month), email notifications, and audit trail.
@@ -17,19 +23,21 @@ This project adds a Google Apps Script web application to the existing Shift-Man
 - HR CSV export by date range with Emp ID, Shift Type, and one column per date. Unassigned weekdays default to G; weekends default to O. Shift Type is S if any A, B, D or N occurs in the period, otherwise G.
 - HR can reset a single employee or all employee accounts to the standard temporary password; affected employees must set a new password and recovery question.
 
-## Spreadsheet
+## Spreadsheets
 
-Spreadsheet ID: 1Mzh0H6PQTq6w47fIlMJ6qUL9UT3NvpBvuoBRN_DrSA8
+**Employee and roster spreadsheet:**  
+https://docs.google.com/spreadsheets/d/1Mzh0H6PQTq6w47fIlMJ6qUL9UT3NvpBvuoBRN_DrSA8/edit?usp=sharing
 
-Employee sheet: Emp_List
+Employee sheet: `Emp_List`. The employee class field is the existing `Class` column, with validated values `National`, `Expat`, and `Contract`.
 
-Run setupShiftManagement() once in the Apps Script editor. It creates:
-- Shift_Assignments
-- Shift_Overrides
-- Shift_Swap_Requests
-- Shift_Audit
+**Separate audit spreadsheet:**  
+https://docs.google.com/spreadsheets/d/1X3FzlezQSJqA3a3f8Xj0Oq3bTsy0_BLbQXDE9xFclNU/edit?gid=2020960656#gid=2020960656
 
-It also adds missing account/hierarchy columns only; it does not delete or rewrite existing employee data. Code.gs is kept separate.
+The audit table uses worksheet ID (gid) `2020960656`. The Google account that owns/runs the Apps Script web app must have edit access to both spreadsheets.
+
+Run `setupShiftManagement()` once from the Apps Script editor after syncing these changes. It prepares the regular shift tables in the main spreadsheet and ensures `Shift_Audit` exists in the designated external audit worksheet. It also creates `Shift_Swap_Approval_Links` and `Shift_Downliner_Requests`. The setup runs a one-time, non-destructive migration of previous audit rows into the external audit sheet, skipping matching Audit IDs. The original audit tab/rows are left in place.
+
+The setup also adds missing account/hierarchy columns only; it does not delete or rewrite existing employee data. `Code.gs` is kept separate.
 
 ### Employee directory requirements
 
@@ -86,7 +94,7 @@ Accepted dates: YYYY-MM-DD or M/D/YYYY. HR import allows past/current/future dat
 ## Rules from the supplied BRD
 
 - New schedule effective start date must be after today.
-- Shift change and shift swap dates may be today or future, never past.
+- Direct roster-cell changes and shift swap dates may be today or future for non-HR users; only HR may correct past dates. New recurring schedule start dates must be after today.
 - Pattern sequences repeat indefinitely until a new pattern-level assignment is effective.
 - A single date override does not change the recurring cycle on subsequent dates.
 - Swap partner acceptance precedes SIC and L1 Manager approvals; the swap is applied only after all configured approvers approve.
@@ -96,8 +104,10 @@ Accepted dates: YYYY-MM-DD or M/D/YYYY. HR import allows past/current/future dat
 
 ## Security notes and remaining configuration
 
-- The active-role selector changes the interface scope only among roles already assigned to the signed-in employee. Server-side checks still validate role assignment and employee hierarchy.
+- The active-role selector changes the interface scope only among roles already assigned to the signed-in employee. The class selector defaults to National for HR/SIC/Managers, and to the employee's own class for Employee-only accounts. Server-side checks validate role assignment, selected class and employee hierarchy.
 - Roster view and export date ranges support up to 366 calendar days. Very large date ranges with many employees may produce wide exports.
+- The external audit spreadsheet must be shared with the Apps Script execution account. If that account cannot edit the external workbook/tab, setup and audit-writing actions may fail.
+- The contact form sends email to `hrtimeoffice@ng.indorama.com` with CC to `Olusegun.kehinde@indorama.com`.
 
 - Secret questions are a recovery convenience and are weaker than multi-factor recovery. Use non-obvious answers and restrict web-app access to the workforce.
 - Protect the employee spreadsheet and Apps Script project with company-controlled access. Do not share the bootstrap key or temporary passwords in public channels.

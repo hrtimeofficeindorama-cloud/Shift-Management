@@ -8,16 +8,20 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
   var partner = findEmployeeByIdentity_(partnerEmpId);
   if (!partner) throw new Error("Selected employee was not found.");
   if (employeeId_(requester) === employeeId_(partner)) throw new Error("You cannot swap a shift with yourself.");
+  if (!sameEmployeeClass_(requester, partner)) throw new Error("Shift swaps are only allowed between employees in the same class (National, Expat or Contract).");
+  if (employeeClass_(requester) !== ctx.activeClass) throw new Error("Switch the workspace class filter to your own class (" + employeeClass_(requester) + ") before requesting a swap.");
   var date = isoDate_(parseIsoDate_(shiftDate));
   if (date < todayISO_()) throw new Error("Shift swaps cannot be requested for past dates.");
-  var partners = getAllowedSwapPartners_(requester, getEmployees_());
+  var partners = getAllowedSwapPartners_(requester, getEmployees_()).filter(function(emp) {
+    return employeeClass_(emp) === employeeClass_(requester);
+  });
   if (!partners.some(function(e) { return employeeId_(e) === employeeId_(partner); })) {
     throw new Error("This employee is not an eligible swap partner. Choose a direct downliner, or—if you have none—a colleague sharing your immediate SIC or L1 Manager.");
   }
   var requesterShift = getShiftForDate_(employeeId_(requester), date);
   var partnerShift = getShiftForDate_(employeeId_(partner), date);
   if (!requesterShift || !partnerShift) {
-    throw new Error("Both employees need a scheduled shift for " + date + " before a swap can be requested.");
+    throw new Error("Both employees need a scheduled shift for " + displayDate_(date) + " before a swap can be requested.");
   }
   var sicApprovers = getSwapApprovers_(requester, partner, "SIC");
   var managerApprovers = getSwapApprovers_(requester, partner, "L1 Manager");
@@ -45,7 +49,7 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
     "Comments": String(comment || "")
   }]);
   sendSwapActionNotice_(partner, requestId, "Partner", "Shift swap approval requested",
-    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shifts with you on " + date +
+    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shifts with you on " + displayDate_(date) +
     ". Your shift: " + partnerShift + "; requester shift: " + requesterShift +
     ". Review the request and choose Accept or Decline below.");
   addAudit_(ctx.empId, "SHIFT_SWAP_SUBMITTED", [employeeId_(requester), employeeId_(partner)], [date],
@@ -62,6 +66,10 @@ function getMySwapRequests(token) {
   records.forEach(function(rec) {
     var requesterId = String(rec["Requester ID"] || "");
     var partnerId = String(rec["Partner ID"] || "");
+    var reqEmp = findEmployeeById_(requesterId);
+    var parEmp = findEmployeeById_(partnerId);
+    if (!reqEmp || !parEmp || !sameEmployeeClass_(reqEmp, parEmp) ||
+        employeeClass_(reqEmp) !== ctx.activeClass) return;
     var isRequester = requesterId === actorId;
     var isPartner = partnerId === actorId;
     var sicIds = splitIds_(rec["SIC Approver IDs"]);
@@ -71,15 +79,13 @@ function getMySwapRequests(token) {
     var isSicApprover = ctx.activeRole === "SIC" && sicIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "SIC");
     var isManagerApprover = ctx.activeRole === "L1 Manager" && mgrIds.indexOf(actorId) !== -1 && hasRole_(ctx.employee, "L1 Manager");
     if (!isRequester && !isPartner && !isSicApprover && !isManagerApprover && !(ctx.activeRole === "HR" && hasRole_(ctx.employee, "HR"))) return;
-    var reqEmp = findEmployeeById_(requesterId);
-    var parEmp = findEmployeeById_(partnerId);
     out.push({
       requestId: String(rec["Request ID"]),
       requesterId: requesterId,
       requesterName: reqEmp ? employeeName_(reqEmp) : requesterId,
       partnerId: partnerId,
       partnerName: parEmp ? employeeName_(parEmp) : partnerId,
-      date: normalizeSheetDate_(rec["Shift Date"]),
+      date: displayDate_(normalizeSheetDate_(rec["Shift Date"])),
       requesterShift: String(rec["Requester Original Shift"] || ""),
       partnerShift: String(rec["Partner Original Shift"] || ""),
       status: String(rec.Status || ""),
@@ -110,6 +116,11 @@ function respondToSwapPartner(token, requestId, decision, comment) {
   if (decision !== "accept" && decision !== "decline") throw new Error("Choose accept or decline.");
   var rec = findSwap_(requestId);
   if (String(rec["Partner ID"]) !== ctx.empId) throw new Error("Only the selected swap partner can act on this request.");
+  var requesterClass = employeeClass_(findEmployeeById_(String(rec["Requester ID"] || "")));
+  var partnerClass = employeeClass_(findEmployeeById_(String(rec["Partner ID"] || "")));
+  if (!requesterClass || requesterClass !== partnerClass || requesterClass !== ctx.activeClass) {
+    throw new Error("Switch to the employee's class to process this swap. Swaps must remain within one class.");
+  }
   if (String(rec.Status) !== "Pending Partner") throw new Error("This request is no longer awaiting partner response.");
   var requester = findEmployeeById_(rec["Requester ID"]);
   var partner = findEmployeeById_(rec["Partner ID"]);
@@ -118,7 +129,7 @@ function respondToSwapPartner(token, requestId, decision, comment) {
       "Status": "Declined by Partner", "Partner Decision": "Declined",
       "Partner Responded At": new Date(), "Comments": appendComment_(rec.Comments, comment)
     });
-    sendEmployeeNotice_(requester, "Shift swap declined", employeeName_(partner) + " declined your shift swap for " + normalizeSheetDate_(rec["Shift Date"]) + ".");
+    sendEmployeeNotice_(requester, "Shift swap declined", employeeName_(partner) + " declined your shift swap for " + displayDate_(normalizeSheetDate_(rec["Shift Date"])) + ".");
     addAudit_(ctx.empId, "SHIFT_SWAP_PARTNER_DECLINED", [employeeId_(requester), employeeId_(partner)], [normalizeSheetDate_(rec["Shift Date"])],
       { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
       { requestId: requestId, comment: comment || "" }, "Declined");
@@ -141,13 +152,13 @@ function respondToSwapPartner(token, requestId, decision, comment) {
     var approver = findEmployeeById_(id);
     if (approver) sendSwapActionNotice_(approver, requestId, "SIC", "Shift swap requires SIC approval",
       employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
-      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
+      displayDate_(normalizeSheetDate_(rec["Shift Date"])) + ". Please review the shift details and choose Approve or Reject below.");
   });
   mgrIds.forEach(function(id) {
     var approver = findEmployeeById_(id);
     if (approver) sendSwapActionNotice_(approver, requestId, "L1 Manager", "Shift swap requires L1 Manager approval",
       employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
-      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
+      displayDate_(normalizeSheetDate_(rec["Shift Date"])) + ". Please review the shift details and choose Approve or Reject below.");
   });
   sendEmployeeNotice_(requester, "Shift swap accepted by colleague", employeeName_(partner) + " accepted the request. It has been routed to the SIC(s) and L1 Manager(s) for approval.");
   addAudit_(ctx.empId, "SHIFT_SWAP_PARTNER_ACCEPTED", [employeeId_(requester), employeeId_(partner)], [normalizeSheetDate_(rec["Shift Date"])],
@@ -174,6 +185,10 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
     var partnerId = String(rec["Partner ID"]);
     var requester = findEmployeeById_(requesterId);
     var partner = findEmployeeById_(partnerId);
+    if (!requester || !partner || !sameEmployeeClass_(requester, partner) ||
+        employeeClass_(requester) !== ctx.activeClass) {
+      throw new Error("Switch to the employee's class and confirm that both employees remain in the same class.");
+    }
     var ids = splitIds_(rec[approverType === "SIC" ? "SIC Approver IDs" : "Manager Approver IDs"]);
     if (ids.indexOf(ctx.empId) === -1) throw new Error("You are not an assigned approver for this request.");
     var field = approverType === "SIC" ? "SIC Decisions JSON" : "Manager Decisions JSON";
@@ -187,7 +202,7 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
       });
       [requester, partner].forEach(function(emp) {
         if (emp) sendEmployeeNotice_(emp, "Shift swap rejected", "The shift swap request for " +
-          normalizeSheetDate_(rec["Shift Date"]) + " was rejected by an approver (" + approverType + "). Neither roster was changed.");
+          displayDate_(normalizeSheetDate_(rec["Shift Date"])) + " was rejected by an approver (" + approverType + "). Neither roster was changed.");
       });
       addAudit_(ctx.empId, "SHIFT_SWAP_REJECTED", [requesterId, partnerId], [normalizeSheetDate_(rec["Shift Date"])],
         { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
@@ -215,7 +230,7 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
           "Status": "Needs Review - Shifts Changed", "Completed At": new Date()
         });
         [requester, partner].forEach(function(emp) {
-          sendEmployeeNotice_(emp, "Shift swap needs review", "A roster entry changed while the swap was awaiting approval for " + date + ". The swap was not applied; contact HR/SIC.");
+          sendEmployeeNotice_(emp, "Shift swap needs review", "A roster entry changed while the swap was awaiting approval for " + displayDate_(date) + ". The swap was not applied; contact HR/SIC.");
         });
         addAudit_(ctx.empId, "SHIFT_SWAP_NEEDS_REVIEW", [requesterId, partnerId], [date],
           { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] },
@@ -236,7 +251,7 @@ function decideSwapApproval(token, requestId, approverType, decision, comment) {
         "Status": "Approved and Applied", "Completed At": new Date()
       });
       [requester, partner].forEach(function(emp) {
-        sendEmployeeNotice_(emp, "Shift swap approved", "Your shift swap for " + date + " was approved and applied. The shifts were exchanged for that date only.");
+        sendEmployeeNotice_(emp, "Shift swap approved", "Your shift swap for " + displayDate_(date) + " was approved and applied. The shifts were exchanged for that date only.");
       });
       addAudit_(ctx.empId, "SHIFT_SWAP_APPLIED", [requesterId, partnerId], [date],
         { requester: currentReq, partner: currentPar }, { requester: currentPar, partner: currentReq },
@@ -351,7 +366,7 @@ function getEmailApprovalPreview(token) {
     requesterName: requester ? employeeName_(requester) : String(rec["Requester ID"]),
     partnerId: String(rec["Partner ID"]),
     partnerName: partner ? employeeName_(partner) : String(rec["Partner ID"]),
-    date: normalizeSheetDate_(rec["Shift Date"]),
+    date: displayDate_(normalizeSheetDate_(rec["Shift Date"])),
     requesterShift: String(rec["Requester Original Shift"] || ""),
     partnerShift: String(rec["Partner Original Shift"] || ""),
     approverTypeLabel: String(link["Approver Type"]) === "Partner" ? "Selected swap partner" : String(link["Approver Type"])
@@ -423,6 +438,11 @@ function validateEmailApprovalContext_(link, rec) {
   var decision = String(link.Decision || "");
   var actorId = String(link["Approver ID"] || "");
   if (!rec || !actorId) throw new Error("The approval request could not be found.");
+  var requestEmployee = findEmployeeById_(String(rec["Requester ID"] || ""));
+  var partnerEmployee = findEmployeeById_(String(rec["Partner ID"] || ""));
+  if (!requestEmployee || !partnerEmployee || !sameEmployeeClass_(requestEmployee, partnerEmployee)) {
+    throw new Error("This legacy request cannot be approved because the employees are not in the same class. Ask HR to review it.");
+  }
   if (type === "Partner") {
     if (["accept", "decline"].indexOf(decision) < 0) throw new Error("Invalid partner decision link.");
     if (String(rec["Partner ID"] || "") !== actorId || String(rec.Status || "") !== "Pending Partner") {
@@ -462,7 +482,7 @@ function processPartnerDecisionFromEmail_(actorId, rec, decision) {
       "Comments": appendComment_(rec.Comments, "Partner declined via email approval link")
     });
     if (requester && partner) sendEmployeeNotice_(requester, "Shift swap declined",
-      employeeName_(partner) + " declined your shift swap for " + date + ".");
+      employeeName_(partner) + " declined your shift swap for " + displayDate_(date) + ".");
     addAudit_(actorId, "SHIFT_SWAP_PARTNER_DECLINED", [requesterId, partnerId], [date],
       { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
       { requestId: requestId, method: "Email approval link" }, "Declined");
@@ -487,14 +507,14 @@ function processPartnerDecisionFromEmail_(actorId, rec, decision) {
     var approver = findEmployeeById_(id);
     if (approver) sendSwapActionNotice_(approver, requestId, "SIC", "Shift swap requires SIC approval",
       employeeName_(requester || { "Emp ID": requesterId }) + " and " +
-      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + date +
+      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + displayDate_(date) +
       ". Please review the shift details and choose Approve or Reject below.");
   });
   mgrIds.forEach(function(id) {
     var approver = findEmployeeById_(id);
     if (approver) sendSwapActionNotice_(approver, requestId, "L1 Manager", "Shift swap requires L1 Manager approval",
       employeeName_(requester || { "Emp ID": requesterId }) + " and " +
-      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + date +
+      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + displayDate_(date) +
       ". Please review the shift details and choose Approve or Reject below.");
   });
   if (requester) sendEmployeeNotice_(requester, "Shift swap accepted by colleague",
@@ -524,7 +544,7 @@ function processManagementDecisionFromEmail_(actorId, rec, approverType, decisio
     });
     [requester, partner].forEach(function(emp) {
       if (emp) sendEmployeeNotice_(emp, "Shift swap rejected",
-        "The shift swap request for " + date + " was rejected by an approver (" + approverType + "). Neither roster was changed.");
+        "The shift swap request for " + displayDate_(date) + " was rejected by an approver (" + approverType + "). Neither roster was changed.");
     });
     addAudit_(actorId, "SHIFT_SWAP_REJECTED", [requesterId, partnerId], [date],
       { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
@@ -553,7 +573,7 @@ function processManagementDecisionFromEmail_(actorId, rec, approverType, decisio
       });
       [requester, partner].forEach(function(emp) {
         sendEmployeeNotice_(emp, "Shift swap needs review",
-          "A roster entry changed while the swap was awaiting approval for " + date + ". The swap was not applied; contact HR/SIC.");
+          "A roster entry changed while the swap was awaiting approval for " + displayDate_(date) + ". The swap was not applied; contact HR/SIC.");
       });
       addAudit_(actorId, "SHIFT_SWAP_NEEDS_REVIEW", [requesterId, partnerId], [date],
         { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] },
@@ -575,7 +595,7 @@ function processManagementDecisionFromEmail_(actorId, rec, approverType, decisio
     });
     [requester, partner].forEach(function(emp) {
       sendEmployeeNotice_(emp, "Shift swap approved",
-        "Your shift swap for " + date + " was approved and applied. The shifts were exchanged for that date only.");
+        "Your shift swap for " + displayDate_(date) + " was approved and applied. The shifts were exchanged for that date only.");
     });
     addAudit_(actorId, "SHIFT_SWAP_APPLIED", [requesterId, partnerId], [date],
       { requester: currentReq, partner: currentPar }, { requester: currentPar, partner: currentReq },

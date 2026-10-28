@@ -20,9 +20,9 @@ SHIFT_TABLE_HEADERS["Shift_Audit"] = [
   "Audit ID", "Actor ID", "Action", "Employee IDs", "Effective Dates",
   "Old Values", "New Values", "Details", "Timestamp", "Outcome"
 ];
-SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
-  "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
-  "Expires At", "Status", "Created At", "Used At"
+SHIFT_TABLE_HEADERS["Shift_Downliner_Requests"] = [
+  "Request ID", "Requester ID", "Requester Role", "Employee ID", "Class",
+  "Action", "Status", "Created At", "Decided By", "Decided At", "Comments"
 ];
 SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
   "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
@@ -35,7 +35,7 @@ function ensureAllTables_() {
   if (!employeeSheet) throw new Error("Employee sheet '" + SHIFT_APP_CONFIG.EMPLOYEE_SHEET + "' was not found.");
   ensureEmployeeColumns_(employeeSheet);
   Object.keys(SHIFT_TABLE_HEADERS).forEach(function(name) {
-    ensureTableSheet_(ss, name, SHIFT_TABLE_HEADERS[name]);
+    ensureTableSheet_(getSpreadsheetForTable_(name), name, SHIFT_TABLE_HEADERS[name]);
   });
 }
 
@@ -61,7 +61,10 @@ function ensureEmployeeColumns_(sheet) {
 }
 
 function ensureTableSheet_(ss, name, requiredHeaders) {
-  var sheet = ss.getSheetByName(name);
+  var sheet = name === SHIFT_APP_CONFIG.TABLES.AUDIT && SHIFT_APP_CONFIG.AUDIT_SHEET_ID
+    ? ss.getSheetById(Number(SHIFT_APP_CONFIG.AUDIT_SHEET_ID))
+    : null;
+  if (!sheet) sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
@@ -82,8 +85,19 @@ function openEmployeeSheet_() {
   return sheet;
 }
 
+function getSpreadsheetForTable_(name) {
+  var spreadsheetId = name === SHIFT_APP_CONFIG.TABLES.AUDIT
+    ? SHIFT_APP_CONFIG.AUDIT_SPREADSHEET_ID
+    : SHIFT_APP_CONFIG.SPREADSHEET_ID;
+  return SpreadsheetApp.openById(spreadsheetId || SHIFT_APP_CONFIG.SPREADSHEET_ID);
+}
+
 function tableSheet_(name) {
-  var sheet = SpreadsheetApp.openById(SHIFT_APP_CONFIG.SPREADSHEET_ID).getSheetByName(name);
+  var ss = getSpreadsheetForTable_(name);
+  var sheet = name === SHIFT_APP_CONFIG.TABLES.AUDIT && SHIFT_APP_CONFIG.AUDIT_SHEET_ID
+    ? ss.getSheetById(Number(SHIFT_APP_CONFIG.AUDIT_SHEET_ID))
+    : null;
+  if (!sheet) sheet = ss.getSheetByName(name);
   if (!sheet) throw new Error("Missing data sheet '" + name + "'. Run setupShiftManagement() first.");
   return sheet;
 }
@@ -161,6 +175,37 @@ function employeeName_(emp) {
   return String(getEmpValue_(emp, ["Emp Name", "Employee Name", "Full Name", "Name"]) || "").trim();
 }
 
+function employeeClass_(emp) {
+  var raw = String(getEmpValue_(emp, ["Class"]) || "").trim().toLowerCase();
+  var classes = SHIFT_APP_CONFIG.CLASSES || ["National", "Expat", "Contract"];
+  for (var i = 0; i < classes.length; i++) {
+    if (raw === String(classes[i]).toLowerCase()) return classes[i];
+  }
+  return "";
+}
+
+function getEmployeesByClass_(className) {
+  var selected = String(className || "").trim();
+  if ((SHIFT_APP_CONFIG.CLASSES || []).indexOf(selected) < 0) {
+    throw new Error("Select a valid employee class: " + (SHIFT_APP_CONFIG.CLASSES || []).join(", ") + ".");
+  }
+  return getEmployees_().filter(function(emp) { return employeeClass_(emp) === selected; });
+}
+
+function sameEmployeeClass_(a, b) {
+  return !!a && !!b && !!employeeClass_(a) && employeeClass_(a) === employeeClass_(b);
+}
+
+function displayDate_(dateValue) {
+  var iso = normalizeSheetDate_(dateValue);
+  if (!iso) return "";
+  try {
+    return Utilities.formatDate(parseIsoDate_(iso), SHIFT_APP_CONFIG.TIME_ZONE, "dd/MMM/yyyy");
+  } catch (err) {
+    return String(dateValue || "");
+  }
+}
+
 function employeeEmail_(emp) {
   return String(getEmpValue_(emp, ["Official Email", "Official Email Id", "Work Email", "Personal Email", "Personal Email Id", "Email"]) || "").trim();
 }
@@ -176,6 +221,7 @@ function publicEmployee_(emp) {
     empId: employeeId_(emp), name: employeeName_(emp),
     department: String(getEmpValue_(emp, ["Department", "Departments Hierarchy 2 Name"]) || ""),
     businessUnit: String(getEmpValue_(emp, ["Business Unit", "Group Company Code"]) || ""),
+    employeeClass: employeeClass_(emp),
     officialEmail: String(getEmpValue_(emp, ["Official Email", "Official Email Id", "Work Email"]) || ""),
     role: getRoles_(emp).join(", "), roles: getRoles_(emp),
     sic: String(getEmpValue_(emp, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]) || ""),
@@ -248,11 +294,17 @@ function sameImmediateUplineGroup_(a, b) {
 }
 
 function getAllowedSwapPartners_(actor, employees) {
-  var direct = getDownliners_(actor, employees);
-  if (direct.length) return direct;
   var actorId = employeeId_(actor);
+  var actorClass = employeeClass_(actor);
+  if (!actorClass) return [];
+  var direct = getDownliners_(actor, employees).filter(function(candidate) {
+    return employeeClass_(candidate) === actorClass;
+  });
+  if (direct.length) return direct;
   return employees.filter(function(candidate) {
-    return employeeId_(candidate) !== actorId && sameImmediateUplineGroup_(actor, candidate);
+    return employeeId_(candidate) !== actorId &&
+      employeeClass_(candidate) === actorClass &&
+      sameImmediateUplineGroup_(actor, candidate);
   });
 }
 
@@ -400,7 +452,9 @@ function escapeHtmlForEmail_(value) {
 
 function createRosterGrid_(employees, fromDate, toDate) {
   var dates = datesForRange_(fromDate, toDate);
-  var rows = employees.map(function(emp) {
+  var rows = employees.slice().sort(function(a, b) {
+    return employeeId_(a).localeCompare(employeeId_(b), undefined, { numeric: true, sensitivity: "base" });
+  }).map(function(emp) {
     var shifts = {};
     dates.forEach(function(date) { shifts[date] = getShiftForDate_(employeeId_(emp), date); });
     return { employee: publicEmployee_(emp), shifts: shifts };
@@ -493,4 +547,35 @@ function getSwapApprovers_(employeeA, employeeB, kind) {
     });
   });
   return refs;
+}
+
+/** One-time, non-destructive migration of existing audit rows to the dedicated workbook. */
+function migrateLegacyAuditRows_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty("SHIFT_AUDIT_MIGRATION_DONE") === "true") return 0;
+  var sourceSpreadsheet = SpreadsheetApp.openById(SHIFT_APP_CONFIG.SPREADSHEET_ID);
+  var sourceSheet = sourceSpreadsheet.getSheetByName(SHIFT_APP_CONFIG.TABLES.AUDIT);
+  if (!sourceSheet || sourceSheet.getLastRow() < 2) {
+    props.setProperty("SHIFT_AUDIT_MIGRATION_DONE", "true");
+    return 0;
+  }
+  var existingIds = {};
+  getTableRows_(SHIFT_APP_CONFIG.TABLES.AUDIT).forEach(function(row) {
+    existingIds[String(row["Audit ID"] || "")] = true;
+  });
+  var values = sourceSheet.getRange(1, 1, sourceSheet.getLastRow(), sourceSheet.getLastColumn()).getValues();
+  var headers = values[0].map(function(header) { return String(header || "").trim(); });
+  var migrated = [];
+  for (var i = 1; i < values.length; i++) {
+    if (values[i].every(function(value) { return value === "" || value === null; })) continue;
+    var obj = {};
+    headers.forEach(function(header, idx) { obj[header] = values[i][idx]; });
+    var id = String(obj["Audit ID"] || "");
+    if (id && existingIds[id]) continue;
+    if (id) existingIds[id] = true;
+    migrated.push(obj);
+  }
+  appendObjects_(SHIFT_APP_CONFIG.TABLES.AUDIT, migrated);
+  props.setProperty("SHIFT_AUDIT_MIGRATION_DONE", "true");
+  return migrated.length;
 }

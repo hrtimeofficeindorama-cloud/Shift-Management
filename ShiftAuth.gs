@@ -121,6 +121,7 @@ function adminSetRoles(token, targetEmpId, roles) {
   requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Choose the employee's class in the workspace filter before assigning roles.");
   var chosen = Array.isArray(roles) ? roles : String(roles || "").split(/[,;|]/);
   chosen = chosen.map(function(role) {
     var key = norm_(role);
@@ -155,6 +156,7 @@ function adminResetEmployeePassword(token, targetEmpId) {
   requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Choose the employee's class in the workspace filter before resetting this account.");
   return resetEmployeeToTemporary_(target, ctx.empId, "PASSWORD_RESET_BY_HR");
 }
 
@@ -202,7 +204,7 @@ function adminResetAllPasswordsToTemporary(token, confirmation) {
 function getAdminEmployeeList(token) {
   var ctx = requireFullSession_(token);
   requireActiveRole_(ctx, "HR");
-  return getEmployees_().map(publicEmployee_);
+  return getEmployeesByClass_(ctx.activeClass).map(publicEmployee_);
 }
 
 function setActiveRole(token, requestedRole) {
@@ -215,9 +217,31 @@ function setActiveRole(token, requestedRole) {
   if (!raw) throw new Error("Your session has expired. Sign in again.");
   var session = JSON.parse(raw);
   session.activeRole = role;
+  if (role === "Employee") session.activeClass = employeeClass_(ctx.employee) || "National";
   cache.put(key, JSON.stringify(session), SHIFT_SESSION_TTL_SECONDS);
   addAudit_(ctx.empId, "ACTIVE_ROLE_CHANGED", [ctx.empId], [], ctx.activeRole, role, "User switched interface role", "Success");
   return { success: true, activeRole: role };
+}
+
+function setActiveClass(token, requestedClass) {
+  var ctx = requireFullSession_(token);
+  var selected = String(requestedClass || "").trim();
+  if ((SHIFT_APP_CONFIG.CLASSES || []).indexOf(selected) < 0) {
+    throw new Error("Select a valid employee class.");
+  }
+  if (ctx.activeRole === "Employee" && selected !== employeeClass_(ctx.employee)) {
+    throw new Error("Employees can only use the class assigned to their own employee record.");
+  }
+  var cache = CacheService.getScriptCache();
+  var key = "SHIFT_SESSION_" + sha256Text_(String(token));
+  var raw = cache.get(key);
+  if (!raw) throw new Error("Your session has expired. Sign in again.");
+  var session = JSON.parse(raw);
+  var previous = String(session.activeClass || "National");
+  session.activeClass = selected;
+  cache.put(key, JSON.stringify(session), SHIFT_SESSION_TTL_SECONDS);
+  addAudit_(ctx.empId, "ACTIVE_CLASS_CHANGED", [ctx.empId], [], previous, selected, "User changed the workspace employee class filter", "Success");
+  return { success: true, activeClass: selected };
 }
 
 function requireActiveRole_(ctx, requiredRole) {
@@ -249,8 +273,13 @@ function getAuthContext_(token) {
   var roles = getRoles_(emp);
   var activeRole = String(session.activeRole || (roles.indexOf("HR") >= 0 ? "HR" : roles[0] || "Employee"));
   if (roles.indexOf(activeRole) < 0) activeRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
+  var classes = SHIFT_APP_CONFIG.CLASSES || ["National", "Expat", "Contract"];
+  var defaultClass = employeeClass_(emp) || "National";
+  var activeClass = String(session.activeClass || defaultClass);
+  if (classes.indexOf(activeClass) < 0) activeClass = defaultClass;
+  if (activeRole === "Employee") activeClass = defaultClass;
   return {
-    employee: emp, empId: employeeId_(emp), activeRole: activeRole,
+    employee: emp, empId: employeeId_(emp), activeRole: activeRole, activeClass: activeClass,
     mustChangePassword: stored.indexOf("TEMPv1$") === 0,
     needsRecoverySetup: !question || !answerHash,
     token: token
@@ -269,7 +298,8 @@ function issueSession_(emp, version) {
   var roles = getRoles_(emp);
   var initialRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   CacheService.getScriptCache().put("SHIFT_SESSION_" + sha256Text_(token), JSON.stringify({
-    empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole, issued: new Date().getTime()
+    empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole,
+    activeClass: employeeClass_(emp) || "National", issued: new Date().getTime()
   }), SHIFT_SESSION_TTL_SECONDS);
   return token;
 }

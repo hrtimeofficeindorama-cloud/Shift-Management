@@ -52,3 +52,36 @@ function getAuditRows(token, limit) {
     };
   });
 }
+
+function sendDeveloperContact(token, category, subject, message) {
+  var ctx = requireFullSession_(token);
+  category = String(category || "").trim();
+  subject = String(subject || "").trim();
+  message = String(message || "").trim();
+  if (!category) throw new Error("Choose a contact type.");
+  if (subject.length < 3 || subject.length > 140) throw new Error("Subject must be between 3 and 140 characters.");
+  if (message.length < 10 || message.length > 5000) throw new Error("Message must be between 10 and 5,000 characters.");
+  var safeEmp = ctx.employee;
+  var identity = employeeName_(safeEmp) + " (" + ctx.empId + ")";
+  var body = "Shift Management contact form submission\n\n" +
+    "Type: " + category + "\n" +
+    "Subject: " + subject + "\n" +
+    "Employee: " + identity + "\n" +
+    "Official email: " + employeeEmail_(safeEmp) + "\n" +
+    "Active role: " + ctx.activeRole + "\n" +
+    "Selected class: " + ctx.activeClass + "\n" +
+    "Submitted at: " + Utilities.formatDate(new Date(), SHIFT_APP_CONFIG.TIME_ZONE, "dd/MMM/yyyy HH:mm") +
+    "\n\nMessage:\n" + message +
+    "\n\nAutomated notification from Shift Management.";
+  MailApp.sendEmail({
+    to: "hrtimeoffice@ng.indorama.com",
+    cc: "Olusegun.kehinde@indorama.com",
+    replyTo: employeeEmail_(safeEmp) || undefined,
+    name: "Shift Management",
+    subject: "[Shift Management Support] " + subject,
+    body: body
+  });
+  addAudit_(ctx.empId, "DEVELOPER_CONTACT_SUBMITTED", [ctx.empId], [], "", "",
+    { category: category, subject: subject }, "Email sent to support");
+  return { success: true, message: "Your message has been sent to the Shift Management support contacts." };
+}
