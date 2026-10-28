@@ -175,7 +175,7 @@
               <div class="card col-6">
                 <div class="card-head"><div><h2>Schedule a shift</h2><p>New schedules must begin after today.</p></div><span class="pill">SIC / HR</span></div>
                 <form id="scheduleForm">
-                  <div class="field"><label for="scheduleEmployees">Employees / group</label><input class="employee-search" type="search" data-filter-target="scheduleEmployees" placeholder="Type employee name or ID to filter"><select id="scheduleEmployees" multiple size="7" required></select><div class="help">Select one or more employees. Use Ctrl or Command to select multiple entries.</div></div>
+                  <div class="field"><label for="scheduleEmployees">Employees / group</label><input class="employee-search" type="search" data-filter-target="scheduleEmployees" placeholder="Type employee name or ID to filter"><select id="scheduleEmployees" multiple size="7" required></select><div class="help">Tick the checkbox beside each employee to include them in this schedule.</div></div>
                   <div class="field"><label for="schedulePattern">Shift pattern</label><select id="schedulePattern" required></select></div>
                   <div class="field"><label for="scheduleStart">Effective start date</label><input type="date" id="scheduleStart" required></div>
                   <div class="field"><label for="scheduleNotes">Notes (optional)</label><input id="scheduleNotes" placeholder="Operational reason or group name"></div>
@@ -663,10 +663,18 @@
     var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+1);
     return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   }
+  function titleCaseEmployeeName(value){
+    return String(value===null||value===undefined?"":value).trim().toLowerCase().split(/(\s+|-|')/).map(function(part){
+      if(!part)return part;
+      var first=part.charAt(0);
+      return first.toUpperCase()!==first.toLowerCase()?first.toUpperCase()+part.slice(1):part;
+    }).join("");
+  }
   function formatProperName(value){
-    return String(value===null||value===undefined?"":value).trim().toLowerCase().replace(/(^|[\\s\\-'.])([a-z])/g,function(match,prefix,letter){
-      return prefix+letter.toUpperCase();
-    });
+    var text=String(value===null||value===undefined?"":value).trim();
+    var separator=text.indexOf(" — ");
+    if(separator>=0)return text.slice(0,separator)+" — "+titleCaseEmployeeName(text.slice(separator+3));
+    return titleCaseEmployeeName(text);
   }
   function formatDateDisplay(value){
     var text=String(value===null||value===undefined?"":value).trim();
@@ -1251,11 +1259,13 @@
   $("scheduleForm").addEventListener("submit",function(e){
     e.preventDefault();
     var ids=selectedValues("scheduleEmployees");
+    if(!ids.length){toast("Tick at least one employee checkbox to schedule.","error");return;}
     var req={employeeIds:ids,patternName:$("schedulePattern").value,startDate:$("scheduleStart").value,notes:$("scheduleNotes").value};
     api("createShiftSchedule",[token,req],function(result){toast(result.message,"success");$("scheduleNotes").value="";loadDashboard();},e.submitter);
   });
   $("swapForm").addEventListener("submit",function(e){
     e.preventDefault();
+    if(!validateEmployeeSelection("swapPartner","Tick the checkbox beside the colleague you want to swap with."))return;
     api("submitShiftSwap",[token,$("swapPartner").value,$("swapDate").value,$("swapComment").value],function(result){
       toast(result.message,"success");$("swapComment").value="";loadSwaps();loadDashboard();
     },e.submitter);
@@ -1273,6 +1283,7 @@
   });
   $("rolesForm").addEventListener("submit",function(e){
     e.preventDefault();
+    if(!validateEmployeeSelection("adminEmployee","Tick the employee checkbox before saving roles."))return;
     var roles=Array.from(document.querySelectorAll(".roleCheckbox:checked")).map(function(c){return c.value;});
     api("adminSetRoles",[token,$("adminEmployee").value,roles],function(result){toast("Roles saved for "+result.employee.name+".","success");loadApplication();},e.submitter);
   });
@@ -1292,7 +1303,7 @@
   });
   $("provisionForm").addEventListener("submit",function(e){
     e.preventDefault();
-    if(!$("provisionEmployee").value){toast("Select an employee to reset.","error");return;}
+    if(!validateEmployeeSelection("provisionEmployee","Tick the employee checkbox before resetting the password."))return;
     api("adminResetEmployeePassword",[token,$("provisionEmployee").value],function(result){toast(result.message,"success");},e.submitter);
   });
   $("resetAllPasswordsButton").addEventListener("click",function(){
