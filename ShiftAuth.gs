@@ -217,6 +217,7 @@ function setActiveRole(token, requestedRole) {
   if (!raw) throw new Error("Your session has expired. Sign in again.");
   var session = JSON.parse(raw);
   session.activeRole = role;
+  if (role === "Employee") session.activeClass = employeeClass_(ctx.employee) || "National";
   cache.put(key, JSON.stringify(session), SHIFT_SESSION_TTL_SECONDS);
   addAudit_(ctx.empId, "ACTIVE_ROLE_CHANGED", [ctx.empId], [], ctx.activeRole, role, "User switched interface role", "Success");
   return { success: true, activeRole: role };
