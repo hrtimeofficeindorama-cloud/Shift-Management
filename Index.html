@@ -613,8 +613,35 @@
       $("rosterTable").innerHTML='<div class="empty">No employees are assigned under this role and class. Use Add / remove downliners if the assignment is missing, or choose another class above.</div>';
       updateRosterSelectionCount();initRosterSlider();return;
     }
-    var html='<div class="roster-table-wrap" id="rosterScrollWrap"><table><thead><tr><th class="sticky-id" style="min-width:110px;width:110px">Emp ID</th><th class="sticky-name" style="min-width:170px;width:170px">Emp Name</th>';
-    roster.dates.forEach(function(date){html+='<th title="'+esc(formatDateDisplay(date))+'">'+esc(formatDateDisplay(date))+'</th>';});
+    var weekDays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    var monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var monthGroups=[];
+    roster.dates.forEach(function(date){
+      var key=String(date).slice(0,7);
+      var group=monthGroups[monthGroups.length-1];
+      if(!group||group.key!==key){
+        var parts=key.split("-");
+        group={key:key,label:monthNames[Number(parts[1])-1]+", "+parts[0],count:0};
+        monthGroups.push(group);
+      }
+      group.count++;
+    });
+    var html='<div class="roster-table-wrap" id="rosterScrollWrap"><table><thead>'+
+      '<tr class="month-row"><th class="sticky-id" rowspan="3">Emp ID</th><th class="sticky-name" rowspan="3">emp name</th>';
+    monthGroups.forEach(function(group){
+      html+='<th class="month-group" colspan="'+group.count+'">'+esc(group.label)+'</th>';
+    });
+    html+='</tr><tr class="weekday-row">';
+    roster.dates.forEach(function(date){
+      var d=new Date(String(date)+"T12:00:00");
+      var day=weekDays[d.getDay()];
+      html+='<th title="'+esc(formatDateDisplay(date))+'"><span class="roster-weekday">'+day+'</span></th>';
+    });
+    html+='</tr><tr class="day-row">';
+    roster.dates.forEach(function(date){
+      var day=String(date).slice(8,10);
+      html+='<th class="roster-day" title="'+esc(formatDateDisplay(date))+'">'+esc(day)+'</th>';
+    });
     html+='</tr></thead><tbody>';
     roster.rows.forEach(function(row,rowIndex){
       html+='<tr data-row-index="'+rowIndex+'"><td class="sticky-id">'+esc(row.employee.empId)+'</td><td class="sticky-name">'+esc(row.employee.name||"")+'</td>';
