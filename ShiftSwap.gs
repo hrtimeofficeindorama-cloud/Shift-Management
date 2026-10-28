@@ -438,6 +438,11 @@ function validateEmailApprovalContext_(link, rec) {
   var decision = String(link.Decision || "");
   var actorId = String(link["Approver ID"] || "");
   if (!rec || !actorId) throw new Error("The approval request could not be found.");
+  var requestEmployee = findEmployeeById_(String(rec["Requester ID"] || ""));
+  var partnerEmployee = findEmployeeById_(String(rec["Partner ID"] || ""));
+  if (!requestEmployee || !partnerEmployee || !sameEmployeeClass_(requestEmployee, partnerEmployee)) {
+    throw new Error("This legacy request cannot be approved because the employees are not in the same class. Ask HR to review it.");
+  }
   if (type === "Partner") {
     if (["accept", "decline"].indexOf(decision) < 0) throw new Error("Invalid partner decision link.");
     if (String(rec["Partner ID"] || "") !== actorId || String(rec.Status || "") !== "Pending Partner") {
