@@ -121,6 +121,7 @@ function adminSetRoles(token, targetEmpId, roles) {
   requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Choose the employee's class in the workspace filter before assigning roles.");
   var chosen = Array.isArray(roles) ? roles : String(roles || "").split(/[,;|]/);
   chosen = chosen.map(function(role) {
     var key = norm_(role);
@@ -155,6 +156,7 @@ function adminResetEmployeePassword(token, targetEmpId) {
   requireActiveRole_(ctx, "HR");
   var target = findEmployeeByIdentity_(targetEmpId);
   if (!target) throw new Error("Employee ID was not found.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Choose the employee's class in the workspace filter before resetting this account.");
   return resetEmployeeToTemporary_(target, ctx.empId, "PASSWORD_RESET_BY_HR");
 }
 
@@ -202,7 +204,7 @@ function adminResetAllPasswordsToTemporary(token, confirmation) {
 function getAdminEmployeeList(token) {
   var ctx = requireFullSession_(token);
   requireActiveRole_(ctx, "HR");
-  return getEmployees_().map(publicEmployee_);
+  return getEmployeesByClass_(ctx.activeClass).map(publicEmployee_);
 }
 
 function setActiveRole(token, requestedRole) {
