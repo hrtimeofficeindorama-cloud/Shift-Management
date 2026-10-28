@@ -6,11 +6,23 @@ function getInitialData(token) {
   var actor = ctx.employee;
   var employees = getEmployees_();
   var roles = getRoles_(actor);
-  var team = getTeamForActiveRole_(actor, employees, ctx.activeRole);
-  var canSchedule = ctx.activeRole === "HR" || ctx.activeRole === "SIC";
+  var classEmployees = getEmployeesByClass_(ctx.activeClass);
+  var team = getTeamForActiveRole_(actor, employees, ctx.activeRole).filter(function(emp) {
+    return employeeClass_(emp) === ctx.activeClass;
+  });
+  var canSchedule = ["HR", "SIC", "L1 Manager"].indexOf(ctx.activeRole) >= 0;
+  var swapPartners = [];
+  if (employeeClass_(actor) === ctx.activeClass) {
+    swapPartners = getAllowedSwapPartners_(actor, employees).filter(function(emp) {
+      return employeeClass_(emp) === employeeClass_(actor);
+    });
+  }
   return {
     employee: publicEmployee_(actor), roles: roles, activeRole: ctx.activeRole,
+    activeClass: ctx.activeClass, classes: SHIFT_APP_CONFIG.CLASSES,
     isHr: ctx.activeRole === "HR", canSchedule: canSchedule,
+    canEditRoster: canSchedule || ctx.activeRole === "Employee",
+    canRequestDownliners: ["SIC", "L1 Manager"].indexOf(ctx.activeRole) >= 0,
     canViewTeam: team.length > 0 || hasRole_(actor, "HR"),
     canBulkImport: ctx.activeRole === "HR",
     patterns: Object.keys(SHIFT_APP_CONFIG.PATTERNS).map(function(name) {
@@ -22,7 +34,8 @@ function getInitialData(token) {
       return { code: code, label: SHIFT_APP_CONFIG.SHIFT_CODES[code].label, in: SHIFT_APP_CONFIG.SHIFT_CODES[code].in, out: SHIFT_APP_CONFIG.SHIFT_CODES[code].out };
     }),
     team: team.map(publicEmployee_),
-    swapPartners: getAllowedSwapPartners_(actor, employees).map(publicEmployee_),
+    classEmployees: classEmployees.map(publicEmployee_),
+    swapPartners: swapPartners.map(publicEmployee_),
     today: todayISO_()
   };
 }
@@ -32,8 +45,9 @@ function getRosterData(token, fromDate, toDate) {
   var dates = datesForRange_(fromDate, toDate);
   var employees = getEmployees_();
   var actor = ctx.employee;
-  var allowed = ctx.activeRole === "HR" ? employees : getTeamForActiveRole_(actor, employees, ctx.activeRole);
-  if (!allowed.length) allowed = [actor];
+  var allowed = (ctx.activeRole === "HR" ? employees : getTeamForActiveRole_(actor, employees, ctx.activeRole))
+    .filter(function(emp) { return employeeClass_(emp) === ctx.activeClass; });
+  if (!allowed.length && employeeClass_(actor) === ctx.activeClass) allowed = [actor];
   return createRosterGrid_(allowed, dates[0], dates[dates.length - 1]);
 }
 
@@ -54,7 +68,7 @@ function getEmployeeRoster(token, empId, fromDate, toDate) {
 function createShiftSchedule(token, request) {
   var ctx = requireFullSession_(token);
   request = request || {};
-  requireActiveRoleOneOf_(ctx, ["HR", "SIC"]);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC", "L1 Manager"]);
   var startISO = isoDate_(parseIsoDate_(request.startDate));
   if (startISO <= todayISO_()) throw new Error("A new shift schedule must start after today.");
   var patternName = String(request.patternName || "");
@@ -64,7 +78,7 @@ function createShiftSchedule(token, request) {
   var employees = ids.map(function(id) {
     var emp = findEmployeeById_(id);
     if (!emp) throw new Error("Employee not found: " + id);
-    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot schedule shifts for " + id + " under your active role.");
+    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot schedule shifts for " + id + " under your active role or selected class.");
     return emp;
   });
   var groupId = Utilities.getUuid();
@@ -91,14 +105,14 @@ function createShiftSchedule(token, request) {
 function createShiftChange(token, request) {
   var ctx = requireFullSession_(token);
   request = request || {};
-  requireActiveRoleOneOf_(ctx, ["HR", "SIC"]);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC", "L1 Manager"]);
   var mode = String(request.mode || "");
   var ids = normalizeEmployeeIds_(request.employeeIds);
   if (!ids.length) throw new Error("Select at least one employee.");
   var employees = ids.map(function(id) {
     var emp = findEmployeeById_(id);
     if (!emp) throw new Error("Employee not found: " + id);
-    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot change shifts for " + id + " under your active role.");
+    if (!canManageEmployeeForActiveRole_(ctx, emp)) throw new Error("You cannot change shifts for " + id + " under your active role or selected class.");
     return emp;
   });
   if (mode === "pattern") {
@@ -312,10 +326,10 @@ function exportShiftRoster(token, fromDate, toDate) {
   var start = isoDate_(parseIsoDate_(fromDate || defaults.start));
   var end = isoDate_(parseIsoDate_(toDate || defaults.end));
   var dates = datesForRange_(start, end);
-  var employees = getEmployees_().slice().sort(function(a, b) {
-    return employeeId_(a).localeCompare(employeeId_(b), undefined, {numeric:true});
+  var employees = getEmployeesByClass_(ctx.activeClass).slice().sort(function(a, b) {
+    return employeeId_(a).localeCompare(employeeId_(b), undefined, {numeric:true,sensitivity:"base"});
   });
-  var headers = ["Emp ID", "Shift Type"].concat(dates);
+  var headers = ["Emp ID", "Shift Type"].concat(dates.map(displayDate_));
   var rows = employees.map(function(emp) {
     var codes = dates.map(function(date) {
       var code = getShiftForDate_(employeeId_(emp), date);
@@ -340,8 +354,16 @@ function currentMonthRange_() {
 
 
 function canManageEmployeeForActiveRole_(ctx, target) {
-  if (!ctx || !target) return false;
+  if (!ctx || !target || employeeClass_(target) !== ctx.activeClass) return false;
   if (ctx.activeRole === "HR") return hasRole_(ctx.employee, "HR");
-  if (ctx.activeRole === "SIC") return hasRole_(ctx.employee, "SIC") && (employeeId_(target) === ctx.empId || isAssignedSicTo_(target, ctx.employee));
+  if (ctx.activeRole === "SIC") {
+    return hasRole_(ctx.employee, "SIC") &&
+      (employeeId_(target) === ctx.empId || isAssignedSicTo_(target, ctx.employee));
+  }
+  if (ctx.activeRole === "L1 Manager") {
+    return hasRole_(ctx.employee, "L1 Manager") &&
+      (employeeId_(target) === ctx.empId || fieldReferencesEmployee_(
+        getEmpValue_(target, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), ctx.employee));
+  }
   return false;
 }
