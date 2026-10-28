@@ -800,6 +800,87 @@
       activePage="dashboard";toast("Interface role changed to "+result.activeRole+".","success");loadApplication();
     });
   });
+  $("activeClassSelect").addEventListener("change",function(){
+    var requested=this.value;
+    api("setActiveClass",[token,requested],function(result){
+      selectedRosterCells={};activePage="dashboard";
+      toast("Class filter changed to "+result.activeClass+".","success");loadApplication();
+    });
+  });
+  document.querySelectorAll("[data-open-page]").forEach(function(button){
+    button.addEventListener("click",function(){showPage(button.dataset.openPage);});
+  });
+  $("rosterHorizontalSlider").addEventListener("input",function(){
+    var wrap=$("rosterScrollWrap");if(wrap)wrap.scrollLeft=Number(this.value)||0;
+  });
+  $("rosterShiftToolbar").addEventListener("click",function(e){
+    var button=e.target.closest("button[data-set-shift]");if(!button)return;
+    applyShiftToSelectedCells(button.dataset.setShift);
+  });
+  $("rosterTable").addEventListener("mousedown",function(e){
+    var cell=e.target.closest(".roster-cell");if(!cell||cell.disabled)return;
+    if(e.shiftKey&&rosterSelectionAnchor)selectRosterRange(rosterSelectionAnchor,cell);
+    else selectRosterCell(cell,!!(e.ctrlKey||e.metaKey));
+    rosterDragSelecting=true;
+  });
+  $("rosterTable").addEventListener("mouseover",function(e){
+    var cell=e.target.closest(".roster-cell");
+    if(rosterDragSelecting&&cell&&!cell.disabled)selectRosterCell(cell,true);
+  });
+  document.addEventListener("mouseup",function(){rosterDragSelecting=false;});
+  $("rosterTable").addEventListener("change",function(e){
+    var cell=e.target.closest(".roster-cell");if(!cell)return;
+    var code=String(cell.value||"").trim().toUpperCase();
+    if(!validateShiftCode(code)){
+      cell.value=cell.dataset.originalCode||"";
+      toast("Only G, A, B, D, N and O are allowed in shift cells.","error");return;
+    }
+    cell.value=code;
+    saveRosterEntries([{empId:cell.dataset.empId,date:cell.dataset.date,shiftCode:code}],
+      "Shift saved for "+cell.dataset.empId+" on "+formatDateDisplay(cell.dataset.date)+".");
+  });
+  $("rosterTable").addEventListener("paste",function(e){
+    var cell=e.target.closest(".roster-cell");if(!cell||cell.disabled)return;
+    var pasted=e.clipboardData&&e.clipboardData.getData("text/plain");
+    if(!pasted)return;
+    e.preventDefault();
+    var text=pasted.replace(/\r/g,"");
+    var lines=text.split("\n");if(lines.length>1&&lines[lines.length-1]==="")lines.pop();
+    var matrix=lines.map(function(line){return line.split("\t");});
+    var entries=[],errors=[];
+    matrix.forEach(function(row,ri){
+      row.forEach(function(value,ci){
+        var code=String(value||"").trim().toUpperCase();
+        if(!code)return;
+        var target=$("rosterTable").querySelector('.roster-cell[data-row-index="'+(Number(cell.dataset.rowIndex)+ri)+'"][data-col-index="'+(Number(cell.dataset.colIndex)+ci)+'"]');
+        if(!target){errors.push("The pasted range extends beyond the visible roster.");return;}
+        if(target.disabled){errors.push("The pasted range contains cells you cannot edit.");return;}
+        if(!validateShiftCode(code)){errors.push("Invalid code '"+code+"'. Use G, A, B, D, N or O.");return;}
+        target.value=code;entries.push({empId:target.dataset.empId,date:target.dataset.date,shiftCode:code});
+      });
+    });
+    if(errors.length){toast(errors[0],"error");loadDashboard();return;}
+    if(entries.length)saveRosterEntries(entries,entries.length+" pasted shift cell(s) saved.");
+  });
+  $("rosterTable").addEventListener("copy",function(e){
+    var cells=Object.keys(selectedRosterCells).map(function(key){return selectedRosterCells[key];});
+    if(cells.length<2||!e.clipboardData)return;
+    var minRow=Math.min.apply(null,cells.map(function(cell){return cell.rowIndex;}));
+    var maxRow=Math.max.apply(null,cells.map(function(cell){return cell.rowIndex;}));
+    var minCol=Math.min.apply(null,cells.map(function(cell){return cell.colIndex;}));
+    var maxCol=Math.max.apply(null,cells.map(function(cell){return cell.colIndex;}));
+    var lines=[];
+    for(var row=minRow;row<=maxRow;row++){
+      var values=[];
+      for(var col=minCol;col<=maxCol;col++){
+        var target=$("rosterTable").querySelector('.roster-cell[data-row-index="'+row+'"][data-col-index="'+col+'"]');
+        values.push(target?target.value:"");
+      }
+      lines.push(values.join("\t"));
+    }
+    e.clipboardData.setData("text/plain",lines.join("\n"));e.preventDefault();
+  });
+
   document.addEventListener("input",function(e){
     if(e.target&&e.target.matches(".employee-search[data-filter-target]"))filterEmployeeSelect(e.target);
   });
