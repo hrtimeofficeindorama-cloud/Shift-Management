@@ -59,7 +59,7 @@
     .role-switch,.class-switch{display:flex;align-items:center;gap:7px}.role-switch label,.class-switch label{margin:0;color:#d7e9f3}.role-switch select,.class-switch select{width:auto;min-width:125px;padding:8px 10px}
     .employee-search{margin:0 0 7px}.roster-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.roster-controls .field{min-width:145px;margin:0}.roster-controls button{height:39px}
     .shift-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 13px;padding:11px;background:#f4f8fb;border:1px solid var(--line);border-radius:10px}.shift-toolbar .toolbar-title{font-size:11px;font-weight:800;color:#486581;margin-right:4px}.shift-code-button{padding:7px 11px;min-width:42px}.shift-code-button[data-code="G"]{background:#237a57}.shift-code-button[data-code="O"]{background:#829ab1}.shift-code-button.active{outline:3px solid #e7b75c;outline-offset:1px}.selected-count{font-size:11px;color:var(--muted);margin-left:auto}
-    .roster-table-wrap{width:100%;max-height:64vh;overflow:auto;border:1px solid var(--line);border-radius:9px;position:relative}.roster-table-wrap table{width:max-content;min-width:100%}.roster-table-wrap th.sticky-id,.roster-table-wrap td.sticky-id{position:sticky;left:0;z-index:3;background:#f0f5f9}.roster-table-wrap td.sticky-id{background:#fff}.roster-table-wrap th.sticky-name,.roster-table-wrap td.sticky-name{position:sticky;left:110px;z-index:3;background:#f0f5f9}.roster-table-wrap td.sticky-name{background:#fff}.roster-table-wrap th:first-child,.roster-table-wrap th:nth-child(2){z-index:5}.roster-cell{width:48px;min-width:48px;height:35px;text-align:center;text-transform:uppercase;font-weight:800;padding:5px 4px;border-radius:4px;border-color:transparent;background:#fff}.roster-cell:not(:disabled){cursor:cell}.roster-cell:disabled{opacity:1;color:var(--ink);background:transparent}.roster-cell:focus{border-color:var(--teal);box-shadow:inset 0 0 0 2px var(--teal)}.roster-cell.shift-A,.roster-cell.shift-B,.roster-cell.shift-D,.roster-cell.shift-N{background:#e7f3fb;color:#175b7b}.roster-cell.shift-G{background:#e5f5ed;color:#237a57}.roster-cell.shift-O{background:#f1f5f9;color:#627d98}.roster-cell.selected{outline:2px solid #e7b75c;outline-offset:-2px}.roster-horizontal{display:flex;align-items:center;gap:12px;margin-top:10px;color:var(--muted);font-size:11px}.roster-horizontal input{padding:0}.roster-note{font-size:11px;color:var(--muted);margin-top:8px}
+    .roster-table-wrap{width:100%;max-height:64vh;overflow:auto;border:1px solid var(--line);border-radius:9px;position:relative;isolation:isolate}.roster-table-wrap table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}.roster-table-wrap th,.roster-table-wrap td{padding:3px 4px;border-right:1px solid #e6edf3;border-bottom:1px solid #d9e2ec;text-align:center;background:#fff}.roster-table-wrap thead th{position:sticky;background:#f0f5f9;color:#486581;text-align:center;text-transform:none;letter-spacing:0;font-size:11px;padding:3px 2px}.roster-table-wrap thead tr.month-row th{top:0;height:27px;z-index:12;font-size:12px;font-weight:750;background:#e9f0f5;color:#243b53}.roster-table-wrap thead tr.weekday-row th{top:27px;height:55px;z-index:11;vertical-align:bottom}.roster-table-wrap thead tr.day-row th{top:82px;height:25px;z-index:11;background:#f0f5f9;font-weight:800}.roster-table-wrap th.month-group{border-bottom:1px solid #c7d4df}.roster-table-wrap th.sticky-id,.roster-table-wrap th.sticky-name{position:sticky;z-index:20;background:#e9f0f5;vertical-align:bottom;padding-bottom:6px}.roster-table-wrap th.sticky-id,.roster-table-wrap td.sticky-id{left:0;min-width:110px;width:110px;max-width:110px;text-align:left}.roster-table-wrap td.sticky-id{position:sticky;left:0;z-index:5;background:#fff}.roster-table-wrap th.sticky-name,.roster-table-wrap td.sticky-name{left:110px;min-width:170px;width:170px;max-width:170px;text-align:left}.roster-table-wrap td.sticky-name{position:sticky;z-index:5;background:#fff}.roster-weekday{display:inline-block;transform:rotate(-90deg);transform-origin:center;white-space:nowrap;font-size:10px;font-weight:650;color:#486581;margin:0 0 14px}.roster-day{display:block;width:35px;min-width:35px;max-width:35px}.roster-table-wrap .shift-cell{width:35px;min-width:35px;max-width:35px;padding:0}.roster-cell{display:block;width:35px;min-width:35px;max-width:35px;height:32px;text-align:center;text-transform:uppercase;font-weight:800;padding:3px 2px;border-radius:0;border-color:transparent;background:#fff}.roster-cell:not(:disabled){cursor:cell}.roster-cell:disabled{opacity:1;color:var(--ink);background:transparent}.roster-cell:focus{border-color:var(--teal);box-shadow:inset 0 0 0 2px var(--teal)}.roster-cell.shift-A,.roster-cell.shift-B,.roster-cell.shift-D,.roster-cell.shift-N{background:#e7f3fb;color:#175b7b}.roster-cell.shift-G{background:#e5f5ed;color:#237a57}.roster-cell.shift-O{background:#f1f5f9;color:#627d98}.roster-cell.selected{outline:2px solid #e7b75c;outline-offset:-2px}.roster-horizontal{display:flex;align-items:center;gap:12px;margin-top:10px;color:var(--muted);font-size:11px}.roster-horizontal input{padding:0}.roster-note{font-size:11px;color:var(--muted);margin-top:8px}
     .downliner-panel{margin-top:16px;border-top:1px solid var(--line);padding-top:15px}.downliner-actions{display:flex;gap:8px;flex-wrap:wrap}.downliner-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:12px}.downliner-row:last-child{border-bottom:0}.downliner-row .details{min-width:0}.downliner-row button{padding:6px 9px;font-size:11px;white-space:nowrap}
     .guide-section{border:1px solid var(--line);border-radius:10px;padding:17px;margin:12px 0;background:#fff}.guide-section h2{margin-bottom:10px}.guide-section ol,.guide-section ul{padding-left:22px;line-height:1.8}.guide-section li{margin:4px 0}.contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.contact-grid .full{grid-column:1/-1}
     .date-shift-builder{display:grid;grid-template-columns:minmax(140px,1fr) minmax(180px,1fr) auto;gap:9px;align-items:end}.date-shift-builder .field{margin:0}.date-shift-builder button{white-space:nowrap}
@@ -236,6 +236,31 @@
                   <div class="actions"><button type="submit">Reset password</button></div>
                 </form>
                 <div class="rule"></div><div class="field"><label>Bulk account reset</label><p class="help">Reset every employee account to the standard temporary password. This signs out existing sessions and requires each employee to set a new password and recovery question.</p><button type="button" class="danger" id="resetAllPasswordsButton">Reset all employee passwords</button></div>
+              </div>
+              <div class="card col-12">
+                <div class="card-head"><div><h2>Assign SIC and L1 Manager</h2><p>Select an employee and assign one or more SICs and Managers from the current class.</p></div></div>
+                <form id="hierarchyForm">
+                  <div class="field">
+                    <label for="hierarchyEmployeeSearch">Find employee (name or ID)</label>
+                    <input class="employee-search" type="search" data-filter-target="hierarchyEmployee" id="hierarchyEmployeeSearch" placeholder="Search employee to update">
+                    <select id="hierarchyEmployee" required></select>
+                  </div>
+                  <div class="form-grid">
+                    <div class="field">
+                      <label for="hierarchySicSearch">Assign SIC(s)</label>
+                      <input class="employee-search" type="search" data-filter-target="hierarchySics" id="hierarchySicSearch" placeholder="Search SIC name or ID">
+                      <select id="hierarchySics" multiple size="7"></select>
+                      <div class="help">Any employee selected as an SIC will automatically receive the SIC role, while retaining their existing roles.</div>
+                    </div>
+                    <div class="field">
+                      <label for="hierarchyManagerSearch">Assign L1 Manager(s)</label>
+                      <input class="employee-search" type="search" data-filter-target="hierarchyManagers" id="hierarchyManagerSearch" placeholder="Search manager name or ID">
+                      <select id="hierarchyManagers" multiple size="7"></select>
+                    </div>
+                  </div>
+                  <div class="actions"><button type="submit" id="saveHierarchyButton">Save reporting assignments</button><button type="button" class="secondary" id="clearHierarchySelections">Clear SIC/Manager selections</button></div>
+                  <p class="help">Saving replaces the selected employee's SIC/Manager assignment values with the selections shown. Multiple SICs and Managers are supported.</p>
+                </form>
               </div>
               <div class="card col-6">
                 <div class="card-head"><div><h2>Pending downliner requests</h2><p>Approve or reject requests to assign an additional SIC or L1 Manager.</p></div><button class="secondary" type="button" id="refreshDownlinerRequestsButton">Refresh</button></div>
@@ -502,6 +527,16 @@
       }).join("")+
       '<span class="selected-count" id="rosterSelectionCount">0 cells selected</span>';
 
+    if(initData.isHr){
+      var hierarchyPeople=(initData.classEmployees||[]).slice().sort(function(a,b){
+        return String(a.empId).localeCompare(String(b.empId),undefined,{numeric:true,sensitivity:"base"});
+      });
+      $("hierarchyEmployee").innerHTML='<option value="">Select employee…</option>'+hierarchyPeople.map(function(e){
+        return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
+      }).join("");
+      $("hierarchyEmployee").value="";
+      syncHierarchySelectors();
+    }
     renderCurrentDownliners();
     applyEmployeeFilters();
     renderGuide();
@@ -516,6 +551,33 @@
         if(activePage==="admin")loadDownlinerRequests();
       });
     }
+  }
+  function hierarchyFieldContains(fieldValue, employee){
+    var identities=[employee&&employee.empId,employee&&employee.name,employee&&employee.officialEmail]
+      .map(normalizeClientIdentity).filter(Boolean);
+    return String(fieldValue||"").split(/[,;|]/).some(function(part){
+      return identities.indexOf(normalizeClientIdentity(part))>=0;
+    });
+  }
+  function syncHierarchySelectors(){
+    if(!initData||!initData.isHr)return;
+    var people=(initData.classEmployees||[]).slice();
+    var targetId=$("hierarchyEmployee").value;
+    var target=people.find(function(e){return String(e.empId)===String(targetId);});
+    var candidates=people.filter(function(e){return String(e.empId)!==String(targetId);});
+    function populate(id,field){
+      var select=$(id);
+      select.innerHTML=candidates.map(function(e){
+        return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
+      }).join("");
+      Array.from(select.options).forEach(function(option){
+        var candidate=people.find(function(e){return String(e.empId)===String(option.value);});
+        option.selected=!!(target&&candidate&&hierarchyFieldContains(target[field]||"",candidate));
+      });
+    }
+    populate("hierarchySics","sic");
+    populate("hierarchyManagers","manager");
+    applyEmployeeFilters();
   }
   function applyEmployeeFilters(){
     document.querySelectorAll(".employee-search[data-filter-target]").forEach(function(input){filterEmployeeSelect(input);});
@@ -588,8 +650,35 @@
       $("rosterTable").innerHTML='<div class="empty">No employees are assigned under this role and class. Use Add / remove downliners if the assignment is missing, or choose another class above.</div>';
       updateRosterSelectionCount();initRosterSlider();return;
     }
-    var html='<div class="roster-table-wrap" id="rosterScrollWrap"><table><thead><tr><th class="sticky-id" style="min-width:110px;width:110px">Emp ID</th><th class="sticky-name" style="min-width:170px;width:170px">Emp Name</th>';
-    roster.dates.forEach(function(date){html+='<th title="'+esc(formatDateDisplay(date))+'">'+esc(formatDateDisplay(date))+'</th>';});
+    var weekDays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    var monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var monthGroups=[];
+    roster.dates.forEach(function(date){
+      var key=String(date).slice(0,7);
+      var group=monthGroups[monthGroups.length-1];
+      if(!group||group.key!==key){
+        var parts=key.split("-");
+        group={key:key,label:monthNames[Number(parts[1])-1]+", "+parts[0],count:0};
+        monthGroups.push(group);
+      }
+      group.count++;
+    });
+    var html='<div class="roster-table-wrap" id="rosterScrollWrap"><table><thead>'+
+      '<tr class="month-row"><th class="sticky-id" rowspan="3">Emp ID</th><th class="sticky-name" rowspan="3">emp name</th>';
+    monthGroups.forEach(function(group){
+      html+='<th class="month-group" colspan="'+group.count+'">'+esc(group.label)+'</th>';
+    });
+    html+='</tr><tr class="weekday-row">';
+    roster.dates.forEach(function(date){
+      var d=new Date(String(date)+"T12:00:00");
+      var day=weekDays[d.getDay()];
+      html+='<th title="'+esc(formatDateDisplay(date))+'"><span class="roster-weekday">'+day+'</span></th>';
+    });
+    html+='</tr><tr class="day-row">';
+    roster.dates.forEach(function(date){
+      var day=String(date).slice(8,10);
+      html+='<th class="roster-day" title="'+esc(formatDateDisplay(date))+'">'+esc(day)+'</th>';
+    });
     html+='</tr></thead><tbody>';
     roster.rows.forEach(function(row,rowIndex){
       html+='<tr data-row-index="'+rowIndex+'"><td class="sticky-id">'+esc(row.employee.empId)+'</td><td class="sticky-name">'+esc(row.employee.name||"")+'</td>';
@@ -971,6 +1060,20 @@
     e.preventDefault();
     var roles=Array.from(document.querySelectorAll(".roleCheckbox:checked")).map(function(c){return c.value;});
     api("adminSetRoles",[token,$("adminEmployee").value,roles],function(result){toast("Roles saved for "+result.employee.name+".","success");loadApplication();},e.submitter);
+  });
+  $("hierarchyEmployee").addEventListener("change",function(){syncHierarchySelectors();});
+  $("clearHierarchySelections").addEventListener("click",function(){
+    Array.from($("hierarchySics").options).forEach(function(option){option.selected=false;});
+    Array.from($("hierarchyManagers").options).forEach(function(option){option.selected=false;});
+    toast("SIC and Manager selections cleared. Click Save reporting assignments to apply the change.","success");
+  });
+  $("hierarchyForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    if(!$("hierarchyEmployee").value){toast("Select the employee whose reporting assignments you want to update.","error");return;}
+    api("adminAssignEmployeeHierarchy",[token,$("hierarchyEmployee").value,selectedValues("hierarchySics"),selectedValues("hierarchyManagers")],function(result){
+      toast(result.message,"success");
+      loadApplication();
+    },e.submitter);
   });
   $("provisionForm").addEventListener("submit",function(e){
     e.preventDefault();

@@ -143,6 +143,79 @@ function adminSetRoles(token, targetEmpId, roles) {
   return { success: true, employee: publicEmployee_(findEmployeeById_(employeeId_(target))) };
 }
 
+/**
+ * HR controls an employee's SIC and L1 Manager relationships from one form.
+ * Every employee referenced as an SIC automatically receives the SIC app role.
+ */
+function adminAssignEmployeeHierarchy(token, targetEmpId, sicEmployeeIds, managerEmployeeIds) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  var allEmployees = getEmployees_();
+  var byId = {};
+  allEmployees.forEach(function(emp) { byId[employeeId_(emp)] = emp; });
+
+  var target = byId[String(targetEmpId || "").trim()];
+  if (!target) throw new Error("Select a valid employee.");
+  if (employeeClass_(target) !== ctx.activeClass) {
+    throw new Error("The employee must belong to the selected class (" + ctx.activeClass + ").");
+  }
+
+  var sicIds = normalizeEmployeeIds_(sicEmployeeIds);
+  var managerIds = normalizeEmployeeIds_(managerEmployeeIds);
+  function validatePeople(ids, label) {
+    return ids.map(function(id) {
+      var emp = byId[id];
+      if (!emp) throw new Error(label + " employee not found: " + id);
+      if (employeeId_(emp) === employeeId_(target)) {
+        throw new Error("An employee cannot be their own SIC or L1 Manager.");
+      }
+      if (employeeClass_(emp) !== ctx.activeClass) {
+        throw new Error(label + " " + employeeName_(emp) + " is not in the selected class (" + ctx.activeClass + ").");
+      }
+      return emp;
+    });
+  }
+  var sics = validatePeople(sicIds, "SIC");
+  var managers = validatePeople(managerIds, "L1 Manager");
+  var oldSic = String(getEmpValue_(target, ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]) || "");
+  var oldManager = String(getEmpValue_(target, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]) || "");
+
+  updateEmployeeFields_(target, {
+    "SIC|Shift In Charge|Shift In-Charge|Shift Incharge": sicIds.join(", "),
+    "L1 Manager|L1Manager|Manager|Reporting Manager|Line Manager": managerIds.join(", ")
+  });
+
+  var autoRoleAdded = [];
+  sics.forEach(function(sic) {
+    var roles = getRoles_(sic);
+    if (roles.indexOf("SIC") >= 0) return;
+    roles.push("SIC");
+    updateEmployeeFields_(sic, { "Role|Roles|Access Role": roles.join(", ") });
+    autoRoleAdded.push(employeeId_(sic));
+  });
+
+  addAudit_(ctx.empId, "EMPLOYEE_HIERARCHY_ASSIGNED", [employeeId_(target)], [], {
+    sic: oldSic, manager: oldManager
+  }, {
+    sic: sicIds.join(", "), manager: managerIds.join(", ")
+  }, {
+    employeeClass: employeeClass_(target),
+    sicRoleAutomaticallyAddedTo: autoRoleAdded
+  }, "Success");
+
+  // Refresh newly assigned SIC roles on the directory snapshot before returning to the UI.
+  var refreshedTarget = findEmployeeByIdentity_(employeeId_(target));
+  return {
+    success: true,
+    employee: publicEmployee_(refreshedTarget || target),
+    sicIds: sicIds,
+    managerIds: managerIds,
+    sicRolesAdded: autoRoleAdded,
+    message: "SIC and L1 Manager assignments saved." +
+      (autoRoleAdded.length ? " SIC role automatically added to " + autoRoleAdded.join(", ") + "." : "")
+  };
+}
+
 function adminProvisionAccount(token, targetEmpId) {
   var ctx = requireFullSession_(token);
   requireActiveRole_(ctx, "HR");

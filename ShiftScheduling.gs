@@ -42,8 +42,11 @@ function getInitialData(token) {
 
 function getRosterData(token, fromDate, toDate) {
   var ctx = requireFullSession_(token);
+  return getRosterDataForContext_(ctx, getEmployees_(), fromDate, toDate);
+}
+
+function getRosterDataForContext_(ctx, employees, fromDate, toDate) {
   var dates = datesForRange_(fromDate, toDate);
-  var employees = getEmployees_();
   var actor = ctx.employee;
   var allowed = (ctx.activeRole === "HR" ? employees : getTeamForActiveRole_(actor, employees, ctx.activeRole))
     .filter(function(emp) { return employeeClass_(emp) === ctx.activeClass; });
