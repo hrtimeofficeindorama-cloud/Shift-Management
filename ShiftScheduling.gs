@@ -430,7 +430,9 @@ function canEditRosterCell_(ctx, target) {
       (employeeId_(target) === ctx.empId || fieldReferencesEmployee_(
         getEmpValue_(target, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), ctx.employee));
   }
-  return ctx.activeRole === "Employee" && employeeId_(target) === ctx.empId;
+  // Employee-only users may view their roster and submit swaps, but never directly edit shifts.
+  // Multi-role users can edit their own shifts when they actively use SIC, L1 Manager or HR.
+  return false;
 }
 
 function getClassEmployeeList(token) {
