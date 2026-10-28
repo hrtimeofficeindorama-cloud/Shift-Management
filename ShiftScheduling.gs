@@ -435,7 +435,7 @@ function canEditRosterCell_(ctx, target) {
 
 function getClassEmployeeList(token) {
   var ctx = requireFullSession_(token);
-  requireActiveRoleOneOf_(ctx, ["HR", "SIC", "L1 Manager", "Employee"]);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC", "L1 Manager"]);
   return getEmployeesByClass_(ctx.activeClass).map(publicEmployee_);
 }
 
