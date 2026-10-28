@@ -889,6 +889,51 @@
     var input=$(toggle.dataset.togglePassword);if(!input)return;
     var show=input.type==="password";input.type=show?"text":"password";toggle.textContent=show?"Hide":"Show";
   });
+
+  $("manageDownlinersButton").addEventListener("click",function(){
+    $("downlinerManager").classList.toggle("hidden");
+    if(!$("downlinerManager").classList.contains("hidden"))renderCurrentDownliners();
+  });
+  $("closeDownlinerManager").addEventListener("click",function(){
+    $("downlinerManager").classList.add("hidden");
+  });
+  $("downlinerEmployeeSearch").addEventListener("input",function(){
+    var target=$("downlinerEmployee"),term=String(this.value||"").trim().toLowerCase();
+    Array.from(target.options).forEach(function(option){
+      option.hidden=!!option.value&&option.textContent.toLowerCase().indexOf(term)<0;
+    });
+  });
+  $("downlinerRequestForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    if(!$("downlinerEmployee").value){toast("Select an employee from the selected class.","error");return;}
+    api("createDownlinerRequest",[token,$("downlinerEmployee").value,initData.activeRole,$("downlinerComment").value],function(result){
+      toast(result.message,"success");$("downlinerComment").value="";$("downlinerEmployee").value="";
+    },e.submitter);
+  });
+  $("currentDownliners").addEventListener("click",function(e){
+    var button=e.target.closest("button[data-remove-downliner]");if(!button)return;
+    if(!window.confirm("Remove this employee from your "+initData.activeRole+" downliner list? Other assigned SICs/Managers will remain unchanged."))return;
+    api("removeDownliner",[token,button.dataset.removeDownliner,initData.activeRole],function(result){
+      toast(result.message,"success");loadApplication();
+    },button);
+  });
+  $("refreshDownlinerRequestsButton").addEventListener("click",function(){loadDownlinerRequests();});
+  $("downlinerRequestsList").addEventListener("click",function(e){
+    var button=e.target.closest("button[data-downliner-request]");if(!button)return;
+    var decision=button.dataset.decision;
+    var promptText=decision==="approve"?"Optional approval comment:":"Reason for rejecting this assignment request:";
+    var comment=window.prompt(promptText,"");
+    if(comment===null)return;
+    api("decideDownlinerRequest",[token,button.dataset.downlinerRequest,decision,comment],function(result){
+      toast(result.message,"success");loadDownlinerRequests();loadApplication();
+    },button);
+  });
+  $("developerContactForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    api("sendDeveloperContact",[token,$("contactCategory").value,$("contactSubject").value,$("contactMessage").value],function(result){
+      toast(result.message,"success");$("contactSubject").value="";$("contactMessage").value="";
+    },e.submitter);
+  });
   $("refreshSwapsButton").addEventListener("click",function(){loadSwaps();},false);
   $("refreshAuditButton").addEventListener("click",function(){loadAudit();},false);
   $("scheduleForm").addEventListener("submit",function(e){
