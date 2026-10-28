@@ -29,7 +29,7 @@ function getDashboardData(token, fromDate, toDate) {
   var employees = getEmployees_();
   var roster = getRosterDataForContext_(ctx, employees, start, end);
   var currentShift = getShiftForDate_(ctx.empId, today) || "Not scheduled";
-  var swaps = getMySwapRequests(token, employees);
+  var swaps = getMySwapRequests(token, employees, ctx);
   var result = {
     employee: publicEmployee_(ctx.employee),
     today: today, rosterFrom: start, rosterTo: end,
