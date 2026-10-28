@@ -55,11 +55,9 @@ function getEmployeeRoster(token, empId, fromDate, toDate) {
   var ctx = requireFullSession_(token);
   var target = findEmployeeByIdentity_(empId);
   if (!target) throw new Error("Employee not found.");
-  var teamIds = getDownliners_(ctx.employee, getEmployees_()).map(employeeId_);
-  if (!canManageEmployee_(ctx.employee, target) &&
-      !(hasRole_(ctx.employee, "L1 Manager") && teamIds.indexOf(employeeId_(target)) >= 0) &&
-      employeeId_(ctx.employee) !== employeeId_(target) && !hasRole_(ctx.employee, "HR")) {
-    throw new Error("You do not have permission to view this roster.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Switch to the employee's class before viewing this roster.");
+  if (!canEditRosterCell_(ctx, target)) {
+    throw new Error("You do not have permission to view this employee's roster under the selected role.");
   }
   var dates = datesForRange_(fromDate, toDate);
   return createRosterGrid_([target], dates[0], dates[dates.length - 1]);
@@ -93,7 +91,7 @@ function createShiftSchedule(token, request) {
   }));
   employees.forEach(function(emp) {
     sendEmployeeNotice_(emp, "New shift schedule", "A new shift pattern has been assigned.\nPattern: " + patternName +
-      "\nPattern sequence: " + SHIFT_APP_CONFIG.PATTERNS[patternName] + "\nEffective from: " + startISO +
+      "\nPattern sequence: " + SHIFT_APP_CONFIG.PATTERNS[patternName] + "\nEffective from: " + displayDate_(startISO) +
       "\nPlease sign in to Shift Management to view your roster.");
   });
   addAudit_(ctx.empId, "SHIFT_SCHEDULE_CREATED", ids, [startISO], "", {
@@ -132,7 +130,7 @@ function createShiftChange(token, request) {
     }));
     employees.forEach(function(emp) {
       sendEmployeeNotice_(emp, "Shift pattern changed", "Your recurring shift pattern has changed to " + patternName +
-        " (" + SHIFT_APP_CONFIG.PATTERNS[patternName] + ") effective " + effective + ".\nReason: " + (request.reason || "Not specified"));
+        " (" + SHIFT_APP_CONFIG.PATTERNS[patternName] + ") effective " + displayDate_(effective) + ".\nReason: " + (request.reason || "Not specified"));
     });
     addAudit_(ctx.empId, "SHIFT_PATTERN_CHANGED", ids, [effective], "", {
       patternName: patternName, sequence: SHIFT_APP_CONFIG.PATTERNS[patternName]
@@ -167,7 +165,7 @@ function createShiftChange(token, request) {
   appendObjects_(SHIFT_APP_CONFIG.TABLES.OVERRIDES, overrides);
   employees.forEach(function(emp) {
     var selected = entries.map(function(e) {
-      return isoDate_(parseIsoDate_(e.date)) + " = " + String(e.shiftCode || "").toUpperCase();
+      return displayDate_(isoDate_(parseIsoDate_(e.date))) + " = " + String(e.shiftCode || "").toUpperCase();
     }).join("\n");
     sendEmployeeNotice_(emp, "Shift date(s) changed", "Your roster has been updated for the following date(s):\n" +
       selected + "\nReason: " + (request.reason || "Not specified"));
