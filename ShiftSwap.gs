@@ -58,8 +58,8 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
   return { success: true, requestId: requestId, message: "Swap request sent to " + employeeName_(partner) + " for partner acceptance." };
 }
 
-function getMySwapRequests(token, employeeDirectory) {
-  var ctx = requireFullSession_(token);
+function getMySwapRequests(token, employeeDirectory, sessionContext) {
+  var ctx = sessionContext || requireFullSession_(token);
   var actorId = ctx.empId;
   var employees = employeeDirectory || getEmployees_();
   var employeeById = {};
