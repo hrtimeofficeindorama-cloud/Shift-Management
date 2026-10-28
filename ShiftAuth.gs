@@ -166,6 +166,9 @@ function adminAssignEmployeeHierarchy(token, targetEmpId, sicEmployeeIds, manage
     return ids.map(function(id) {
       var emp = byId[id];
       if (!emp) throw new Error(label + " employee not found: " + id);
+      if (employeeId_(emp) === employeeId_(target)) {
+        throw new Error("An employee cannot be their own SIC or L1 Manager.");
+      }
       if (employeeClass_(emp) !== ctx.activeClass) {
         throw new Error(label + " " + employeeName_(emp) + " is not in the selected class (" + ctx.activeClass + ").");
       }
