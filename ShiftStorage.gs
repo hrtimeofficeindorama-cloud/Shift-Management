@@ -287,11 +287,17 @@ function sameImmediateUplineGroup_(a, b) {
 }
 
 function getAllowedSwapPartners_(actor, employees) {
-  var direct = getDownliners_(actor, employees);
-  if (direct.length) return direct;
   var actorId = employeeId_(actor);
+  var actorClass = employeeClass_(actor);
+  if (!actorClass) return [];
+  var direct = getDownliners_(actor, employees).filter(function(candidate) {
+    return employeeClass_(candidate) === actorClass;
+  });
+  if (direct.length) return direct;
   return employees.filter(function(candidate) {
-    return employeeId_(candidate) !== actorId && sameImmediateUplineGroup_(actor, candidate);
+    return employeeId_(candidate) !== actorId &&
+      employeeClass_(candidate) === actorClass &&
+      sameImmediateUplineGroup_(actor, candidate);
   });
 }
 
