@@ -43,7 +43,9 @@ var SHIFT_APP_CONFIG = {
  */
 function setupShiftManagement() {
   ensureAllTables_();
+  var migratedAudits = migrateLegacyAuditRows_();
   // Running setup from the editor prompts for the email permission needed by notifications.
   MailApp.getRemainingDailyQuota();
-  return "Shift Management setup completed. Review Emp_List and assign at least one employee Role = HR.";
+  return "Shift Management setup completed. Audit storage is configured in the separate audit spreadsheet. Migrated " +
+    migratedAudits + " existing audit row(s). Review Emp_List and ensure at least one employee has Role = HR.";
 }
