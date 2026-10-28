@@ -452,11 +452,51 @@ function escapeHtmlForEmail_(value) {
 
 function createRosterGrid_(employees, fromDate, toDate) {
   var dates = datesForRange_(fromDate, toDate);
-  var rows = employees.slice().sort(function(a, b) {
+  var snapshot = getShiftDataSnapshot_();
+  var sortedEmployees = employees.slice().sort(function(a, b) {
     return employeeId_(a).localeCompare(employeeId_(b), undefined, { numeric: true, sensitivity: "base" });
-  }).map(function(emp) {
+  });
+  var rows = sortedEmployees.map(function(emp) {
+    var empId = employeeId_(emp);
+    var assignments = snapshot.assignmentsByEmployee[empId] || [];
     var shifts = {};
-    dates.forEach(function(date) { shifts[date] = getShiftForDate_(employeeId_(emp), date); });
+    var assignmentIndex = 0;
+    var activeAssignment = null;
+    dates.forEach(function(date) {
+      var chosen = activeAssignment;
+      // Assignments are sorted by effective start date. Advance the cursor once per day
+      // instead of repeatedly scanning every assignment for every cell.
+      while (assignmentIndex < assignments.length &&
+             normalizeSheetDate_(assignments[assignmentIndex]["Effective Start Date"]) <= date) {
+        activeAssignment = assignments[assignmentIndex];
+        assignmentIndex++;
+        chosen = activeAssignment;
+      }
+      chosen = activeAssignment;
+      if (chosen) {
+        // End dates and overlapping assignment ranges are uncommon; preserve exact legacy
+        // semantics by checking the employee's assignment list when a latest entry ended.
+        var best = null;
+        for (var i = 0; i < assignments.length; i++) {
+          var a = assignments[i];
+          var start = normalizeSheetDate_(a["Effective Start Date"]);
+          var end = normalizeSheetDate_(a["Effective End Date"]);
+          if (start && start <= date && (!end || end >= date) &&
+              String(a.Status || "Active") === "Active") {
+            if (!best || start > normalizeSheetDate_(best["Effective Start Date"]) ||
+                (start === normalizeSheetDate_(best["Effective Start Date"]) &&
+                 Number(a.__rowNum) > Number(best.__rowNum))) best = a;
+          }
+        }
+        chosen = best;
+      }
+      var overrideKey = empId + "|" + date;
+      if (Object.prototype.hasOwnProperty.call(snapshot.overrideByEmployeeDate, overrideKey)) {
+        shifts[date] = snapshot.overrideByEmployeeDate[overrideKey];
+      } else {
+        shifts[date] = getAssignmentShiftForDate_(chosen, date);
+      }
+    });
     return { employee: publicEmployee_(emp), shifts: shifts };
   });
   return { dates: dates, rows: rows };
@@ -470,42 +510,79 @@ function invalidateShiftDataCache_() {
 
 function getShiftDataSnapshot_() {
   if (!SHIFT_ROSTER_DATA_CACHE_) {
+    var overrides = getTableRows_(SHIFT_APP_CONFIG.TABLES.OVERRIDES);
+    var assignments = getTableRows_(SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS);
+    var overrideByEmployeeDate = {};
+    var assignmentsByEmployee = {};
+    // Rows are read in sheet order: later active overrides replace earlier active overrides,
+    // matching the previous last-active-row-wins behaviour.
+    overrides.forEach(function(ov) {
+      if (String(ov.Status || "Active") !== "Active") return;
+      var empId = String(ov["Emp ID"] || "");
+      var date = normalizeSheetDate_(ov["Shift Date"]);
+      if (!empId || !date) return;
+      overrideByEmployeeDate[empId + "|" + date] = String(ov["Shift Code"] || "");
+    });
+    assignments.forEach(function(a) {
+      if (String(a.Status || "Active") !== "Active") return;
+      var empId = String(a["Emp ID"] || "");
+      var start = normalizeSheetDate_(a["Effective Start Date"]);
+      if (!empId || !start) return;
+      if (!assignmentsByEmployee[empId]) assignmentsByEmployee[empId] = [];
+      assignmentsByEmployee[empId].push(a);
+    });
+    Object.keys(assignmentsByEmployee).forEach(function(empId) {
+      assignmentsByEmployee[empId].sort(function(a, b) {
+        var sa = normalizeSheetDate_(a["Effective Start Date"]);
+        var sb = normalizeSheetDate_(b["Effective Start Date"]);
+        if (sa !== sb) return sa < sb ? -1 : 1;
+        return Number(a.__rowNum) - Number(b.__rowNum);
+      });
+    });
     SHIFT_ROSTER_DATA_CACHE_ = {
-      overrides: getTableRows_(SHIFT_APP_CONFIG.TABLES.OVERRIDES),
-      assignments: getTableRows_(SHIFT_APP_CONFIG.TABLES.ASSIGNMENTS)
+      overrides: overrides,
+      assignments: assignments,
+      overrideByEmployeeDate: overrideByEmployeeDate,
+      assignmentsByEmployee: assignmentsByEmployee
     };
   }
   return SHIFT_ROSTER_DATA_CACHE_;
 }
 
-function getShiftForDate_(empId, dateIso) {
-  var snapshot = getShiftDataSnapshot_();
-  for (var i = snapshot.overrides.length - 1; i >= 0; i--) {
-    var ov = snapshot.overrides[i];
-    var ovDate = normalizeSheetDate_(ov["Shift Date"]);
-    if (String(ov["Emp ID"]) === String(empId) && ovDate === dateIso && String(ov.Status || "Active") === "Active") {
-      return String(ov["Shift Code"] || "");
-    }
-  }
-  var applicable = snapshot.assignments.filter(function(a) {
-    if (String(a["Emp ID"]) !== String(empId) || String(a.Status || "Active") !== "Active") return false;
-    var start = normalizeSheetDate_(a["Effective Start Date"]);
-    var end = normalizeSheetDate_(a["Effective End Date"]);
-    return start && start <= dateIso && (!end || end >= dateIso);
-  });
-  if (!applicable.length) return "";
-  applicable.sort(function(a, b) {
-    var sa = normalizeSheetDate_(a["Effective Start Date"]);
-    var sb = normalizeSheetDate_(b["Effective Start Date"]);
-    if (sa !== sb) return sa < sb ? -1 : 1;
-    return Number(a.__rowNum) - Number(b.__rowNum);
-  });
-  var assignment = applicable[applicable.length - 1];
+function getAssignmentShiftForDate_(assignment, dateIso) {
+  if (!assignment) return "";
+  var startDate = normalizeSheetDate_(assignment["Effective Start Date"]);
+  var endDate = normalizeSheetDate_(assignment["Effective End Date"]);
+  if (!startDate || startDate > dateIso || (endDate && endDate < dateIso) ||
+      String(assignment.Status || "Active") !== "Active") return "";
   var pattern = SHIFT_APP_CONFIG.PATTERNS[String(assignment["Pattern Name"] || "")];
   if (!pattern) return "";
-  var startDate = normalizeSheetDate_(assignment["Effective Start Date"]);
   var difference = Math.floor((parseIsoDate_(dateIso).getTime() - parseIsoDate_(startDate).getTime()) / 86400000);
   return pattern.charAt(difference % pattern.length);
+}
+
+function getShiftForDate_(empId, dateIso) {
+  var snapshot = getShiftDataSnapshot_();
+  var overrideKey = String(empId) + "|" + dateIso;
+  if (Object.prototype.hasOwnProperty.call(snapshot.overrideByEmployeeDate, overrideKey)) {
+    return snapshot.overrideByEmployeeDate[overrideKey];
+  }
+  var assignments = snapshot.assignmentsByEmployee[String(empId)] || [];
+  var best = null;
+  var bestStart = "";
+  for (var i = 0; i < assignments.length; i++) {
+    var assignment = assignments[i];
+    var start = normalizeSheetDate_(assignment["Effective Start Date"]);
+    var end = normalizeSheetDate_(assignment["Effective End Date"]);
+    if (start && start <= dateIso && (!end || end >= dateIso)) {
+      if (!best || start > bestStart || (start === bestStart &&
+          Number(assignment.__rowNum) > Number(best.__rowNum))) {
+        best = assignment;
+        bestStart = start;
+      }
+    }
+  }
+  return getAssignmentShiftForDate_(best, dateIso);
 }
 
 function normalizeSheetDate_(value) {
