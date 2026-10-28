@@ -220,6 +220,24 @@ function setActiveRole(token, requestedRole) {
   return { success: true, activeRole: role };
 }
 
+function setActiveClass(token, requestedClass) {
+  var ctx = requireFullSession_(token);
+  var selected = String(requestedClass || "").trim();
+  if ((SHIFT_APP_CONFIG.CLASSES || []).indexOf(selected) < 0) {
+    throw new Error("Select a valid employee class.");
+  }
+  var cache = CacheService.getScriptCache();
+  var key = "SHIFT_SESSION_" + sha256Text_(String(token));
+  var raw = cache.get(key);
+  if (!raw) throw new Error("Your session has expired. Sign in again.");
+  var session = JSON.parse(raw);
+  var previous = String(session.activeClass || "National");
+  session.activeClass = selected;
+  cache.put(key, JSON.stringify(session), SHIFT_SESSION_TTL_SECONDS);
+  addAudit_(ctx.empId, "ACTIVE_CLASS_CHANGED", [ctx.empId], [], previous, selected, "User changed the workspace employee class filter", "Success");
+  return { success: true, activeClass: selected };
+}
+
 function requireActiveRole_(ctx, requiredRole) {
   if (!ctx || ctx.activeRole !== requiredRole || getRoles_(ctx.employee).indexOf(requiredRole) < 0) {
     throw new Error("Switch to the " + requiredRole + " role to perform this action.");
@@ -249,8 +267,11 @@ function getAuthContext_(token) {
   var roles = getRoles_(emp);
   var activeRole = String(session.activeRole || (roles.indexOf("HR") >= 0 ? "HR" : roles[0] || "Employee"));
   if (roles.indexOf(activeRole) < 0) activeRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
+  var classes = SHIFT_APP_CONFIG.CLASSES || ["National", "Expat", "Contract"];
+  var activeClass = String(session.activeClass || "National");
+  if (classes.indexOf(activeClass) < 0) activeClass = "National";
   return {
-    employee: emp, empId: employeeId_(emp), activeRole: activeRole,
+    employee: emp, empId: employeeId_(emp), activeRole: activeRole, activeClass: activeClass,
     mustChangePassword: stored.indexOf("TEMPv1$") === 0,
     needsRecoverySetup: !question || !answerHash,
     token: token
@@ -269,7 +290,8 @@ function issueSession_(emp, version) {
   var roles = getRoles_(emp);
   var initialRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   CacheService.getScriptCache().put("SHIFT_SESSION_" + sha256Text_(token), JSON.stringify({
-    empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole, issued: new Date().getTime()
+    empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole,
+    activeClass: "National", issued: new Date().getTime()
   }), SHIFT_SESSION_TTL_SECONDS);
   return token;
 }
