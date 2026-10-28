@@ -1061,6 +1061,20 @@
     var roles=Array.from(document.querySelectorAll(".roleCheckbox:checked")).map(function(c){return c.value;});
     api("adminSetRoles",[token,$("adminEmployee").value,roles],function(result){toast("Roles saved for "+result.employee.name+".","success");loadApplication();},e.submitter);
   });
+  $("hierarchyEmployee").addEventListener("change",function(){syncHierarchySelectors();});
+  $("clearHierarchySelections").addEventListener("click",function(){
+    Array.from($("hierarchySics").options).forEach(function(option){option.selected=false;});
+    Array.from($("hierarchyManagers").options).forEach(function(option){option.selected=false;});
+    toast("SIC and Manager selections cleared. Click Save reporting assignments to apply the change.","success");
+  });
+  $("hierarchyForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    if(!$("hierarchyEmployee").value){toast("Select the employee whose reporting assignments you want to update.","error");return;}
+    api("adminAssignEmployeeHierarchy",[token,$("hierarchyEmployee").value,selectedValues("hierarchySics"),selectedValues("hierarchyManagers")],function(result){
+      toast(result.message,"success");
+      loadApplication();
+    },e.submitter);
+  });
   $("provisionForm").addEventListener("submit",function(e){
     e.preventDefault();
     if(!$("provisionEmployee").value){toast("Select an employee to reset.","error");return;}
