@@ -217,7 +217,7 @@ function bulkImportShifts(token, csvText) {
   if (idxEmp < 0 || idxDate < 0 || idxShift < 0) throw new Error("Required CSV columns: Emp ID, Shift Date, Shift Code.");
   var validCodes = Object.keys(SHIFT_APP_CONFIG.SHIFT_CODES);
   var directoryMap = {};
-  getEmployees_().forEach(function(employee) { directoryMap[norm_(employeeId_(employee))] = employee; });
+  getEmployeesByClass_(ctx.activeClass).forEach(function(employee) { directoryMap[norm_(employeeId_(employee))] = employee; });
   var seen = {};
   var good = [];
   var rejected = [];
@@ -366,4 +366,239 @@ function canManageEmployeeForActiveRole_(ctx, target) {
         getEmpValue_(target, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), ctx.employee));
   }
   return false;
+}
+
+
+/** Apply one or more grid-cell changes after validating the entire batch. */
+function updateRosterCells(token, entries) {
+  var ctx = requireFullSession_(token);
+  var items = Array.isArray(entries) ? entries : [];
+  if (!items.length) throw new Error("Select at least one shift cell to update.");
+  if (items.length > 1000) throw new Error("Update no more than 1,000 shift cells at a time.");
+  var permittedRoles = ["HR", "SIC", "L1 Manager", "Employee"];
+  if (permittedRoles.indexOf(ctx.activeRole) < 0 || getRoles_(ctx.employee).indexOf(ctx.activeRole) < 0) {
+    throw new Error("Your active role cannot edit roster cells.");
+  }
+  var validCodes = Object.keys(SHIFT_APP_CONFIG.SHIFT_CODES);
+  var seen = {};
+  var prepared = [];
+  items.forEach(function(item) {
+    var target = findEmployeeById_(item.empId);
+    if (!target) throw new Error("Employee not found: " + item.empId);
+    if (employeeClass_(target) !== ctx.activeClass) throw new Error("Employee " + item.empId + " is not in the selected class " + ctx.activeClass + ".");
+    if (!canEditRosterCell_(ctx, target)) throw new Error("You cannot edit the roster for " + item.empId + " under the selected role.");
+    var date = isoDate_(parseIsoDate_(item.date));
+    if (ctx.activeRole !== "HR" && date < todayISO_()) throw new Error("Only HR can change past roster dates: " + displayDate_(date) + ".");
+    var code = String(item.shiftCode || "").trim().toUpperCase();
+    if (validCodes.indexOf(code) < 0) throw new Error("Invalid shift code for " + displayDate_(date) + ". Use G, A, B, D, N or O.");
+    var key = employeeId_(target) + "|" + date;
+    if (seen[key]) throw new Error("The pasted range contains duplicate employee/date cells.");
+    seen[key] = true;
+    prepared.push({ emp: target, empId: employeeId_(target), date: date, code: code });
+  });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var overrides = prepared.map(function(item) {
+      return {
+        "Override ID": Utilities.getUuid(), "Emp ID": item.empId, "Shift Date": item.date,
+        "Shift Code": item.code, "Source": "Roster Grid Edit",
+        "Reason": "Edited through the roster spreadsheet-style grid",
+        "Related Request ID": "", "Created By": ctx.empId, "Created At": new Date(),
+        "Previous Shift": getShiftForDate_(item.empId, item.date), "Status": "Active"
+      };
+    });
+    appendObjects_(SHIFT_APP_CONFIG.TABLES.OVERRIDES, overrides);
+    addAudit_(ctx.empId, "ROSTER_GRID_UPDATED", prepared.map(function(item) { return item.empId; }),
+      prepared.map(function(item) { return item.date; }),
+      overrides.map(function(item) { return { empId: item["Emp ID"], date: item["Shift Date"], shift: item["Previous Shift"] }; }),
+      prepared.map(function(item) { return { empId: item.empId, date: item.date, shift: item.code }; }),
+      "Updated " + prepared.length + " roster cell(s) through the editable grid", "Success");
+    return { success: true, count: prepared.length, message: prepared.length + " shift cell(s) saved." };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function canEditRosterCell_(ctx, target) {
+  if (!ctx || !target || employeeClass_(target) !== ctx.activeClass) return false;
+  if (ctx.activeRole === "HR") return hasRole_(ctx.employee, "HR");
+  if (ctx.activeRole === "SIC") {
+    return hasRole_(ctx.employee, "SIC") &&
+      (employeeId_(target) === ctx.empId || isAssignedSicTo_(target, ctx.employee));
+  }
+  if (ctx.activeRole === "L1 Manager") {
+    return hasRole_(ctx.employee, "L1 Manager") &&
+      (employeeId_(target) === ctx.empId || fieldReferencesEmployee_(
+        getEmpValue_(target, ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"]), ctx.employee));
+  }
+  return ctx.activeRole === "Employee" && employeeId_(target) === ctx.empId;
+}
+
+function getClassEmployeeList(token) {
+  var ctx = requireFullSession_(token);
+  requireActiveRoleOneOf_(ctx, ["HR", "SIC", "L1 Manager", "Employee"]);
+  return getEmployeesByClass_(ctx.activeClass).map(publicEmployee_);
+}
+
+/** Requests an additional SIC or Manager relationship; HR must approve it. */
+function createDownlinerRequest(token, targetIdentity, relationshipType, comment) {
+  var ctx = requireFullSession_(token);
+  relationshipType = String(relationshipType || "");
+  if (["SIC", "L1 Manager"].indexOf(relationshipType) < 0 || relationshipType !== ctx.activeRole) {
+    throw new Error("Switch to the SIC or L1 Manager role for the relationship you want to request.");
+  }
+  var target = findEmployeeByIdentity_(targetIdentity);
+  if (!target) throw new Error("Employee not found.");
+  if (employeeId_(target) === ctx.empId) throw new Error("You cannot add yourself as a downliner.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Only employees in the selected class (" + ctx.activeClass + ") can be added.");
+  var fieldAliases = relationshipType === "SIC"
+    ? ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]
+    : ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"];
+  if (fieldReferencesEmployee_(getEmpValue_(target, fieldAliases), ctx.employee)) {
+    throw new Error("This employee is already assigned under you as " + relationshipType + ".");
+  }
+  var existing = getTableRows_(SHIFT_APP_CONFIG.TABLES.DOWNLINER_REQUESTS).find(function(row) {
+    return String(row["Requester ID"]) === ctx.empId &&
+      String(row["Employee ID"]) === employeeId_(target) &&
+      String(row["Requester Role"]) === relationshipType &&
+      String(row.Status || "") === "Pending";
+  });
+  if (existing) throw new Error("A request for this employee is already awaiting HR approval.");
+  var requestId = Utilities.getUuid();
+  appendObjects_(SHIFT_APP_CONFIG.TABLES.DOWNLINER_REQUESTS, [{
+    "Request ID": requestId, "Requester ID": ctx.empId, "Requester Role": relationshipType,
+    "Employee ID": employeeId_(target), "Class": ctx.activeClass, "Action": "Add",
+    "Status": "Pending", "Created At": new Date(), "Decided By": "", "Decided At": "",
+    "Comments": String(comment || "")
+  }]);
+  addAudit_(ctx.empId, "DOWNLINER_ADD_REQUESTED", [employeeId_(target)], [], "", "",
+    { requestId: requestId, relationshipType: relationshipType, className: ctx.activeClass, comment: String(comment || "") }, "Pending HR approval");
+  var hrs = getEmployees_().filter(function(emp) { return hasRole_(emp, "HR"); });
+  hrs.forEach(function(hr) {
+    sendEmployeeNotice_(hr, "Downliner assignment requires HR approval",
+      employeeName_(ctx.employee) + " (" + ctx.empId + ") requested to add " + employeeName_(target) +
+      " (" + employeeId_(target) + ") as a downliner under " + relationshipType + " for class " +
+      ctx.activeClass + ". Open Shift Management → HR administration to approve or reject the request.");
+  });
+  return { success: true, requestId: requestId, message: "Request submitted to HR for approval." };
+}
+
+function getDownlinerRequests(token) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  return getTableRows_(SHIFT_APP_CONFIG.TABLES.DOWNLINER_REQUESTS)
+    .filter(function(row) { return String(row.Status || "") === "Pending" && String(row.Class || "") === ctx.activeClass; })
+    .map(function(row) {
+      var requester = findEmployeeById_(String(row["Requester ID"] || ""));
+      var target = findEmployeeById_(String(row["Employee ID"] || ""));
+      return {
+        requestId: String(row["Request ID"] || ""), requesterId: String(row["Requester ID"] || ""),
+        requesterName: requester ? employeeName_(requester) : String(row["Requester ID"] || ""),
+        employeeId: String(row["Employee ID"] || ""),
+        employeeName: target ? employeeName_(target) : String(row["Employee ID"] || ""),
+        relationshipType: String(row["Requester Role"] || ""), className: String(row.Class || ""),
+        action: String(row.Action || "Add"), createdAt: row["Created At"] instanceof Date ?
+          Utilities.formatDate(row["Created At"], SHIFT_APP_CONFIG.TIME_ZONE, "dd/MMM/yyyy HH:mm") : String(row["Created At"] || ""),
+        comments: String(row.Comments || "")
+      };
+    });
+}
+
+function decideDownlinerRequest(token, requestId, decision, comment) {
+  var ctx = requireFullSession_(token);
+  requireActiveRole_(ctx, "HR");
+  decision = String(decision || "").toLowerCase();
+  if (["approve", "reject"].indexOf(decision) < 0) throw new Error("Choose approve or reject.");
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var request = getTableRows_(SHIFT_APP_CONFIG.TABLES.DOWNLINER_REQUESTS).find(function(row) {
+      return String(row["Request ID"] || "") === String(requestId);
+    });
+    if (!request) throw new Error("Downliner request not found.");
+    if (String(request.Status || "") !== "Pending") throw new Error("This request has already been decided.");
+    if (String(request.Class || "") !== ctx.activeClass) throw new Error("Switch to the request's employee class before deciding.");
+    var requester = findEmployeeById_(String(request["Requester ID"] || ""));
+    var target = findEmployeeById_(String(request["Employee ID"] || ""));
+    if (!requester || !target) throw new Error("The requester or employee no longer exists.");
+    var relationshipType = String(request["Requester Role"] || "");
+    if (["SIC", "L1 Manager"].indexOf(relationshipType) < 0 || !hasRole_(requester, relationshipType)) {
+      throw new Error("The requester's role has changed. Reject this request or correct their role first.");
+    }
+    if (employeeClass_(target) !== String(request.Class)) throw new Error("Employee class changed after the request was submitted.");
+    if (decision === "approve") {
+      var aliases = relationshipType === "SIC"
+        ? ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]
+        : ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"];
+      var current = String(getEmpValue_(target, aliases) || "");
+      if (fieldReferencesEmployee_(current, requester)) throw new Error("This employee is already assigned to the requester.");
+      var updated = current.trim() ? current.trim().replace(/[;,|]\s*$/, "") + ", " + employeeId_(requester) : employeeId_(requester);
+      var key = relationshipType === "SIC" ? "SIC|Shift In Charge|Shift In-Charge|Shift Incharge" :
+        "L1 Manager|L1Manager|Manager|Reporting Manager|Line Manager";
+      updateEmployeeFields_(target, (function() { var map = {}; map[key] = updated; return map; })());
+    }
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.DOWNLINER_REQUESTS, "Request ID", requestId, {
+      "Status": decision === "approve" ? "Approved" : "Rejected",
+      "Decided By": ctx.empId, "Decided At": new Date(),
+      "Comments": appendDownlinerComment_(request.Comments, decision === "approve" ? "Approved" : "Rejected", ctx.empId, comment)
+    });
+    addAudit_(ctx.empId, decision === "approve" ? "DOWNLINER_ADD_APPROVED" : "DOWNLINER_ADD_REJECTED",
+      [employeeId_(target)], [], "", decision === "approve" ? { relationshipType: relationshipType, requesterId: employeeId_(requester) } : "",
+      { requestId: requestId, relationshipType: relationshipType, comment: String(comment || "") }, decision === "approve" ? "Success" : "Rejected");
+    if (decision === "approve") {
+      sendEmployeeNotice_(requester, "Downliner assignment approved",
+        employeeName_(target) + " (" + employeeId_(target) + ") is now assigned under you as " + relationshipType + ".");
+      sendEmployeeNotice_(target, "Reporting relationship updated",
+        employeeName_(requester) + " (" + employeeId_(requester) + ") has been added as an additional " + relationshipType + " for your selected employee class.");
+    } else {
+      sendEmployeeNotice_(requester, "Downliner assignment request rejected",
+        "HR rejected your request to add " + employeeName_(target) + " (" + employeeId_(target) + ") as " + relationshipType +
+        ". Comment: " + String(comment || "No comment provided."));
+    }
+    return { success: true, message: decision === "approve" ? "Request approved. The employee has been added to the downliner list." : "Request rejected." };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function removeDownliner(token, targetEmpId, relationshipType) {
+  var ctx = requireFullSession_(token);
+  relationshipType = String(relationshipType || "");
+  if (relationshipType !== ctx.activeRole || ["SIC", "L1 Manager"].indexOf(relationshipType) < 0) {
+    throw new Error("Switch to the SIC or L1 Manager role to manage this relationship.");
+  }
+  var target = findEmployeeByIdentity_(targetEmpId);
+  if (!target) throw new Error("Employee not found.");
+  if (employeeClass_(target) !== ctx.activeClass) throw new Error("Employee is not in the selected class.");
+  var aliases = relationshipType === "SIC"
+    ? ["SIC", "Shift In Charge", "Shift In-Charge", "Shift Incharge"]
+    : ["L1 Manager", "L1Manager", "Manager", "Reporting Manager", "Line Manager"];
+  var current = String(getEmpValue_(target, aliases) || "");
+  if (!fieldReferencesEmployee_(current, ctx.employee)) throw new Error("This employee is not currently assigned under you.");
+  var identities = [
+    employeeId_(ctx.employee), employeeName_(ctx.employee),
+    getEmpValue_(ctx.employee, ["Official Email", "Official Email Id", "Work Email"]),
+    getEmpValue_(ctx.employee, ["Personal Email", "Personal Email Id", "Email"])
+  ].map(norm_).filter(Boolean);
+  var remaining = current.split(/[,;|]/).map(function(value) { return value.trim(); }).filter(function(value) {
+    return value && identities.indexOf(norm_(value)) < 0;
+  });
+  var fieldKey = relationshipType === "SIC" ? "SIC|Shift In Charge|Shift In-Charge|Shift Incharge" :
+    "L1 Manager|L1Manager|Manager|Reporting Manager|Line Manager";
+  var update = {}; update[fieldKey] = remaining.join(", ");
+  updateEmployeeFields_(target, update);
+  addAudit_(ctx.empId, "DOWNLINER_REMOVED", [employeeId_(target)], [], current, remaining.join(", "),
+    { relationshipType: relationshipType, className: ctx.activeClass }, "Success");
+  sendEmployeeNotice_(target, "Reporting relationship updated",
+    employeeName_(ctx.employee) + " (" + ctx.empId + ") removed themselves as a " + relationshipType +
+    " for your employee record. Other assigned SICs/Managers remain unchanged.");
+  return { success: true, message: employeeName_(target) + " has been removed from your " + relationshipType + " downliner list." };
+}
+
+function appendDownlinerComment_(existing, decision, actorId, comment) {
+  var text = String(existing || "").trim();
+  var addition = "[" + displayDate_(todayISO_()) + "] " + decision + " by " + actorId +
+    (String(comment || "").trim() ? ": " + String(comment).trim() : "");
+  return text ? text + "\n" + addition : addition;
 }
