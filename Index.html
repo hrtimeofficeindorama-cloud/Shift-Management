@@ -451,6 +451,8 @@
     var classes=initData.classes||["National","Expat","Contract"];
     $("activeClassSelect").innerHTML=classes.map(function(name){return '<option value="'+esc(name)+'">'+esc(name)+'</option>';}).join("");
     $("activeClassSelect").value=initData.activeClass||"National";
+    $("activeClassSelect").disabled=initData.activeRole==="Employee";
+    $("activeClassSelect").title=initData.activeRole==="Employee"?"Employee-only access is limited to your own class. Switch to an assigned SIC, L1 Manager or HR role to change class.":"Filter the workspace by employee class.";
     var roles=initData.roles||[];
     $("activeRoleWrap").classList.toggle("hidden",roles.length<2);
     $("activeRoleSelect").innerHTML=roles.map(function(role){return '<option value="'+esc(role)+'">'+esc(role)+'</option>';}).join("");
@@ -713,7 +715,7 @@
     var common='<section class="guide-section"><h2>Getting started and account security</h2><ol>'+
       '<li>Sign in with your employee ID or registered email and your password.</li>'+
       '<li>If the app requests first-time setup, create a new password, confirm it, and set your recovery question and answer.</li>'+
-      '<li>Change your working view using the <strong>Class</strong> selector (National, Expat or Contract) and, when assigned multiple roles, the <strong>Role</strong> selector beside it. Class and role filters apply to the roster, scheduling, shift changes, swap queues and relevant administration lists.</li>'+
+      '<li>HR, SIC and L1 Managers can change the <strong>Class</strong> selector (National, Expat or Contract) to work within a different class. Employee-only accounts are locked to their own class. When assigned multiple roles, use the <strong>Role</strong> selector beside it. Class and role filters apply to roster, scheduling, swaps and relevant administration lists.</li>'+
       '<li>Use <strong>Account security</strong> to change your password or update your recovery question. Never share your password or approval links.</li>'+
       '<li>Use <strong>Platform guide</strong> to read instructions for every role assigned to your account, even when another role is currently selected.</li>'+
       '</ol></section>';
