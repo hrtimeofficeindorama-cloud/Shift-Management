@@ -388,7 +388,7 @@
       $("profileName").textContent=user.name||user.empId;
       $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
       $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
-      $("todayChip").textContent="Today · "+data.today;
+      $("todayChip").textContent="Today · "+formatDateDisplay(data.today);
       $("navSchedule").classList.toggle("hidden",!data.canSchedule);
       $("navAdmin").classList.toggle("hidden",!data.isHr);
       $("navAudit").classList.toggle("hidden",!data.isHr);
@@ -758,7 +758,7 @@
     api("getAuditRows",[token,100],function(rows){
       if(!rows.length){$("auditTable").innerHTML='<div class="empty">No audit events yet.</div>';return;}
       var html='<div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Employees</th><th>Dates</th><th>Outcome</th><th>Details</th></tr></thead><tbody>';
-      rows.forEach(function(r){html+='<tr><td>'+esc(r.timestamp)+'</td><td>'+esc(r.actor)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.employees)+'</td><td>'+esc(r.dates)+'</td><td>'+esc(r.outcome)+'</td><td>'+esc(r.details)+'</td></tr>';});
+      rows.forEach(function(r){html+='<tr><td>'+esc(formatDateDisplay(r.timestamp))+'</td><td>'+esc(r.actor)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.employees)+'</td><td>'+esc(formatDateList(r.dates))+'</td><td>'+esc(r.outcome)+'</td><td>'+esc(r.details)+'</td></tr>';});
       $("auditTable").innerHTML=html+'</tbody></table></div>';
     });
   }
@@ -810,40 +810,11 @@
   });
   $("refreshSwapsButton").addEventListener("click",function(){loadSwaps();},false);
   $("refreshAuditButton").addEventListener("click",function(){loadAudit();},false);
-  $("addDateEntryButton").addEventListener("click",function(){
-    var date=$("dateEntryDate").value;var shift=$("dateEntryShift").value;
-    if(!date||!shift){toast("Select both a calendar date and a replacement shift.","error");return;}
-    var lines=$("dateEntries").value.split(/\r?\n/).map(function(line){return line.trim();}).filter(Boolean);
-    var existing=lines.findIndex(function(line){return line.split(",")[0].trim()===date;});
-    var entry=date+","+shift;
-    if(existing>=0){lines[existing]=entry;toast("Updated the selected shift for "+date+".","success");}
-    else{lines.push(entry);toast("Added "+date+" → "+shift+".","success");}
-    $("dateEntries").value=lines.join("\n");
-    $("dateEntryDate").value="";$("dateEntryShift").value="";
-  });
-  $("changeMode").addEventListener("change",function(){
-    var pattern=this.value==="pattern";
-    $("patternChangeFields").classList.toggle("hidden",!pattern);
-    $("dateChangeFields").classList.toggle("hidden",pattern);
-  });
   $("scheduleForm").addEventListener("submit",function(e){
     e.preventDefault();
     var ids=selectedValues("scheduleEmployees");
     var req={employeeIds:ids,patternName:$("schedulePattern").value,startDate:$("scheduleStart").value,notes:$("scheduleNotes").value};
     api("createShiftSchedule",[token,req],function(result){toast(result.message,"success");$("scheduleNotes").value="";loadDashboard();},e.submitter);
-  });
-  $("changeForm").addEventListener("submit",function(e){
-    e.preventDefault();
-    var mode=$("changeMode").value;
-    var req={employeeIds:selectedValues("changeEmployees"),mode:mode,reason:$("changeReason").value};
-    if(mode==="pattern"){req.patternName=$("changePattern").value;req.effectiveDate=$("changeEffective").value;}
-    else{
-      req.entries=$("dateEntries").value.split(/\r?\n/).map(function(line){
-        var parts=line.split(",");
-        return {date:(parts[0]||"").trim(),shiftCode:(parts[1]||"").trim().toUpperCase()};
-      }).filter(function(e){return e.date&&e.shiftCode;});
-    }
-    api("createShiftChange",[token,req],function(result){toast(result.message,"success");$("changeReason").value="";loadDashboard();},e.submitter);
   });
   $("swapForm").addEventListener("submit",function(e){
     e.preventDefault();
@@ -889,7 +860,7 @@
       link.href=url;link.download="Employee_Shift_Roster_"+result.fromDate+"_to_"+result.toDate+".csv";
       document.body.appendChild(link);link.click();link.remove();
       window.setTimeout(function(){URL.revokeObjectURL(url);},1000);
-      $("exportResult").textContent="Exported "+result.count+" employees from "+result.fromDate+" to "+result.toDate+".";
+      $("exportResult").textContent="Exported "+result.count+" employees from "+formatDateDisplay(result.fromDate)+" to "+formatDateDisplay(result.toDate)+".";
       toast("Shift roster export generated.","success");
     },e.submitter);
   });
@@ -904,7 +875,7 @@
       $("importResult").textContent=result.message;
       if(result.rejectedRows&&result.rejectedRows.length){
         var html='<table><thead><tr><th>Row</th><th>Employee ID</th><th>Date</th><th>Errors</th></tr></thead><tbody>';
-        result.rejectedRows.forEach(function(r){html+='<tr><td>'+esc(r.row)+'</td><td>'+esc(r.employeeId)+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.errors)+'</td></tr>';});
+        result.rejectedRows.forEach(function(r){html+='<tr><td>'+esc(r.row)+'</td><td>'+esc(r.employeeId)+'</td><td>'+esc(formatDateDisplay(r.date))+'</td><td>'+esc(r.errors)+'</td></tr>';});
         $("importErrors").innerHTML=html+'</tbody></table>';$("importErrors").classList.remove("hidden");
       }else{$("importErrors").classList.add("hidden");}
       toast(result.message,"success");loadDashboard();
@@ -932,7 +903,7 @@
       $("profileName").textContent=user.name||user.empId;
       $("avatar").textContent=(user.name||user.empId||"E").trim().charAt(0).toUpperCase();
       $("welcomeText").textContent="Welcome, "+(user.name||user.empId)+". Here is your assigned schedule and team view.";
-      $("todayChip").textContent="Today · "+result.today;
+      $("todayChip").textContent="Today · "+formatDateDisplay(result.today);
       $("navSchedule").classList.toggle("hidden",!result.canSchedule);$("navAdmin").classList.toggle("hidden",!result.isHr);$("navAudit").classList.toggle("hidden",!result.isHr);
       configureForms();loadDashboard();showPage(activePage);
     });
