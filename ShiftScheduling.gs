@@ -349,7 +349,7 @@ function exportShiftRoster(token, fromDate, toDate) {
 function currentMonthRange_() {
   var today = parseIsoDate_(todayISO_());
   var start = isoDate_(new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0));
-  var end = isoDate_(new Date(today.getFullYear(), today.getMonth() + 1, 0, 12, 0, 0));
+  var end = isoDate_(new Date(today.getFullYear(), today.getMonth() + 2, 0, 12, 0, 0));
   return { start: start, end: end };
 }
 
