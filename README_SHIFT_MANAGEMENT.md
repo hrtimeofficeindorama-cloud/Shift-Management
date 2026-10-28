@@ -12,7 +12,9 @@ This project adds a Google Apps Script web application to the existing Shift-Man
 - Spreadsheet-style roster editing: select cells, type approved shift codes, paste TSV ranges, copy selected ranges and drag/select multiple cells. The server validates G, A, B, D, N and O codes and permission per employee/class.
 - Employee-only role is read-only for shift cells and can request swaps; users with multiple roles can edit their own shift only after switching to an assigned SIC, L1 Manager or HR role. Employees needing a direct shift change must contact their SIC, L1 Manager or HR.
 - Dashboard performance uses indexed shift overrides/assignments and reuses one employee-directory snapshot when building the roster and swap panel; execution duration and roster size are logged for diagnosis.
-- The roster table uses a frozen month heading, vertical weekday labels and day-number row; employee ID/name columns stay frozen while scrolling dates.
+- The roster table uses a frozen month heading, horizontal weekday labels on the first date-header line and horizontal day numbers on the second line; employee ID/name columns stay frozen while scrolling dates. The native table scrollbar handles horizontal overflow; no separate date slider is shown.
+- Every employee selection list uses searchable checkboxes; single-select fields allow one checked employee, and group/hierarchy fields allow multiple checked employees.
+- Platform Guide procedures are split into separate task sections, with their own step-by-step numbered instructions for each assigned role.
 - HR can assign multiple SICs and L1 Managers to an employee from HR administration. Assigning an employee as an SIC automatically adds the SIC role without removing their existing roles.
 - SIC/L1 Manager downliner addition requests routed to HR for approval; approved requests append a second or additional reporting relationship without replacing existing SIC/Manager values. Self-removal only removes the current relationship.
 - Role-aware Platform guide with separate instructions for every role assigned to the user, plus a developer/support contact form.
