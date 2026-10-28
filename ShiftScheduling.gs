@@ -34,7 +34,7 @@ function getInitialData(token) {
       return { code: code, label: SHIFT_APP_CONFIG.SHIFT_CODES[code].label, in: SHIFT_APP_CONFIG.SHIFT_CODES[code].in, out: SHIFT_APP_CONFIG.SHIFT_CODES[code].out };
     }),
     team: team.map(publicEmployee_),
-    classEmployees: classEmployees.map(publicEmployee_),
+    classEmployees: (["HR", "SIC", "L1 Manager"].indexOf(ctx.activeRole) >= 0) ? classEmployees.map(publicEmployee_) : [],
     swapPartners: swapPartners.map(publicEmployee_),
     today: todayISO_()
   };
@@ -135,7 +135,7 @@ function createShiftChange(token, request) {
     addAudit_(ctx.empId, "SHIFT_PATTERN_CHANGED", ids, [effective], "", {
       patternName: patternName, sequence: SHIFT_APP_CONFIG.PATTERNS[patternName]
     }, String(request.reason || ""), "Success");
-    return { success: true, message: "Pattern changed for " + employees.length + " employee(s), effective " + effective + "." };
+    return { success: true, message: "Pattern changed for " + employees.length + " employee(s), effective " + displayDate_(effective) + "." };
   }
   if (mode !== "dates") throw new Error("Select a valid shift-change mode.");
   var entries = Array.isArray(request.entries) ? request.entries : [];
@@ -146,8 +146,8 @@ function createShiftChange(token, request) {
   var oldValues = [];
   entries.forEach(function(entry) {
     var date = isoDate_(parseIsoDate_(entry.date));
-    if (ctx.activeRole !== "HR" && date < todayISO_()) throw new Error("Shift changes cannot affect past dates: " + date + ". Switch to HR to make a historical correction.");
-    if (seenDates[date]) throw new Error("The date " + date + " appears more than once. Keep one replacement shift per date.");
+    if (ctx.activeRole !== "HR" && date < todayISO_()) throw new Error("Shift changes cannot affect past dates: " + displayDate_(date) + ". Switch to HR to make a historical correction.");
+    if (seenDates[date]) throw new Error("The date " + displayDate_(date) + " appears more than once. Keep one replacement shift per date.");
     seenDates[date] = true;
     var code = String(entry.shiftCode || "").trim().toUpperCase();
     if (validCodes.indexOf(code) === -1) throw new Error("Invalid shift code: " + code);
