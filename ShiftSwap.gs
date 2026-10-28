@@ -58,16 +58,19 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
   return { success: true, requestId: requestId, message: "Swap request sent to " + employeeName_(partner) + " for partner acceptance." };
 }
 
-function getMySwapRequests(token) {
-  var ctx = requireFullSession_(token);
+function getMySwapRequests(token, employeeDirectory, sessionContext) {
+  var ctx = sessionContext || requireFullSession_(token);
   var actorId = ctx.empId;
+  var employees = employeeDirectory || getEmployees_();
+  var employeeById = {};
+  employees.forEach(function(emp) { employeeById[employeeId_(emp)] = emp; });
   var records = getTableRows_(SHIFT_APP_CONFIG.TABLES.SWAPS);
   var out = [];
   records.forEach(function(rec) {
     var requesterId = String(rec["Requester ID"] || "");
     var partnerId = String(rec["Partner ID"] || "");
-    var reqEmp = findEmployeeById_(requesterId);
-    var parEmp = findEmployeeById_(partnerId);
+    var reqEmp = employeeById[requesterId] || null;
+    var parEmp = employeeById[partnerId] || null;
     if (!reqEmp || !parEmp || !sameEmployeeClass_(reqEmp, parEmp) ||
         employeeClass_(reqEmp) !== ctx.activeClass) return;
     var isRequester = requesterId === actorId;
