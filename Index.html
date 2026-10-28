@@ -538,6 +538,7 @@
       syncHierarchySelectors();
     }
     renderCurrentDownliners();
+    initializeAllEmployeeCheckboxLists();
     applyEmployeeFilters();
     renderGuide();
     if(initData.isHr){
@@ -547,6 +548,7 @@
         }).join("");
         $("adminEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
         $("provisionEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
+        initializeAllEmployeeCheckboxLists();
         applyEmployeeFilters();
         if(activePage==="admin")loadDownlinerRequests();
       });
@@ -578,9 +580,22 @@
     populate("hierarchySics","sic");
     populate("hierarchyManagers","manager");
     applyEmployeeFilters();
+    refreshEmployeeCheckboxList("hierarchySics");
+    refreshEmployeeCheckboxList("hierarchyManagers");
   }
+  var EMPLOYEE_CHECKLIST_CONFIG={
+    scheduleEmployees:{multiple:true,searchId:null},
+    downlinerEmployee:{multiple:false,searchId:"downlinerEmployeeSearch"},
+    swapPartner:{multiple:false,searchId:null},
+    adminEmployee:{multiple:false,searchId:null},
+    provisionEmployee:{multiple:false,searchId:null},
+    hierarchyEmployee:{multiple:false,searchId:"hierarchyEmployeeSearch"},
+    hierarchySics:{multiple:true,searchId:"hierarchySicSearch"},
+    hierarchyManagers:{multiple:true,searchId:"hierarchyManagerSearch"}
+  };
   function applyEmployeeFilters(){
     document.querySelectorAll(".employee-search[data-filter-target]").forEach(function(input){filterEmployeeSelect(input);});
+    Object.keys(EMPLOYEE_CHECKLIST_CONFIG).forEach(function(id){refreshEmployeeCheckboxList(id);});
   }
   function filterEmployeeSelect(input){
     var target=$(input.dataset.filterTarget);if(!target)return;
@@ -589,10 +604,69 @@
       if(!option.value){option.hidden=false;return;}
       option.hidden=option.textContent.toLowerCase().indexOf(term)<0;
     });
+    refreshEmployeeCheckboxList(target.id);
+  }
+  function initializeAllEmployeeCheckboxLists(){
+    Object.keys(EMPLOYEE_CHECKLIST_CONFIG).forEach(function(id){refreshEmployeeCheckboxList(id);});
+  }
+  function refreshEmployeeCheckboxList(selectId){
+    var select=$(selectId),config=EMPLOYEE_CHECKLIST_CONFIG[selectId];
+    if(!select||!config)return;
+    var container=$(selectId+"_checkbox_list");
+    if(!container){
+      container=document.createElement("div");
+      container.id=selectId+"_checkbox_list";
+      container.className="employee-checklist";
+      container.setAttribute("role","group");
+      var label=document.querySelector('label[for="'+selectId+'"]');
+      container.setAttribute("aria-label",label?label.textContent.trim():"Employee selection");
+      select.insertAdjacentElement("afterend",container);
+    }
+    select.classList.add("employee-source-hidden");
+    // Hidden required selects do not participate in browser validation; form handlers
+    // check required employee selections explicitly before submitting.
+    select.required=false;
+    var search=config.searchId?$(config.searchId):document.querySelector('.employee-search[data-filter-target="'+selectId+'"]');
+    var term=String(search&&search.value||"").trim().toLowerCase();
+    var choices=Array.from(select.options).filter(function(option){
+      return !!option.value&&String(option.textContent||"").toLowerCase().indexOf(term)>=0;
+    });
+    if(!choices.length){
+      container.innerHTML='<div class="employee-checklist-empty">No employees match this search.</div>';
+      return;
+    }
+    container.innerHTML=choices.map(function(option){
+      return '<label class="employee-checklist-item"><input type="checkbox" data-employee-select="'+esc(selectId)+'" value="'+esc(option.value)+'" '+(option.selected?'checked':'')+'><span>'+esc(formatProperName(option.textContent))+'</span></label>';
+    }).join("");
+  }
+  function handleEmployeeChecklistChange(input){
+    var select=$(input.dataset.employeeSelect);
+    var config=EMPLOYEE_CHECKLIST_CONFIG[input.dataset.employeeSelect];
+    if(!select||!config)return;
+    if(!config.multiple&&input.checked){
+      Array.from(select.options).forEach(function(option){option.selected=option.value===input.value;});
+    }else{
+      var option=Array.from(select.options).find(function(item){return item.value===input.value;});
+      if(option)option.selected=input.checked;
+    }
+    refreshEmployeeCheckboxList(select.id);
+    select.dispatchEvent(new Event("change",{bubbles:true}));
+  }
+  function validateEmployeeSelection(selectId,message){
+    var select=$(selectId);
+    if(!select)return false;
+    var selected=Array.from(select.options).some(function(option){return option.selected&&!!option.value;});
+    if(!selected){toast(message||"Select an employee before continuing.","error");return false;}
+    return true;
   }
   function nextDate(iso){
     var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+1);
     return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
+  function formatProperName(value){
+    return String(value===null||value===undefined?"":value).trim().toLowerCase().replace(/(^|[\\s\\-'.])([a-z])/g,function(match,prefix,letter){
+      return prefix+letter.toUpperCase();
+    });
   }
   function formatDateDisplay(value){
     var text=String(value===null||value===undefined?"":value).trim();
