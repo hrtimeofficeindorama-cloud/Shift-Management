@@ -18,19 +18,29 @@ function doGet(e) {
 }
 
 function getDashboardData(token, fromDate, toDate) {
+  var started = new Date().getTime();
   var ctx = requireFullSession_(token);
   var today = todayISO_();
   var defaults = currentMonthRange_();
   var start = fromDate || defaults.start;
   var end = toDate || defaults.end;
-  var roster = getRosterData(token, start, end);
-  return {
+  // Read Emp_List once per dashboard request and reuse it for roster permissions,
+  // display rows and swap-request identity resolution.
+  var employees = getEmployees_();
+  var roster = getRosterDataForContext_(ctx, employees, start, end);
+  var currentShift = getShiftForDate_(ctx.empId, today) || "Not scheduled";
+  var swaps = getMySwapRequests(token, employees, ctx);
+  var result = {
     employee: publicEmployee_(ctx.employee),
     today: today, rosterFrom: start, rosterTo: end,
-    currentShift: getShiftForDate_(ctx.empId, today) || "Not scheduled",
+    currentShift: currentShift,
     roster: roster,
-    swaps: getMySwapRequests(token)
+    swaps: swaps
   };
+  console.log("getDashboardData completed in " + (new Date().getTime() - started) +
+    " ms; employees=" + employees.length + ", rosterRows=" + roster.rows.length +
+    ", dates=" + roster.dates.length + ", swapResults=" + swaps.length);
+  return result;
 }
 
 function getAuditRows(token, limit) {
