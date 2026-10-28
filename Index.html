@@ -323,6 +323,11 @@
   var temporaryPasswordRequired = false;
   var recoveryRequired = false;
   var toastTimer = null;
+  var selectedRosterCells = {};
+  var rosterDragSelecting = false;
+  var rosterSelectionAnchor = null;
+  var activeRosterRows = [];
+  var activeRosterDates = [];
 
   function $(id){return document.getElementById(id);}
   function esc(value){
@@ -434,52 +439,79 @@
     if(page==="schedule"&&!initData.canSchedule)page="dashboard";
     if(page==="admin"&&!initData.isHr)page="dashboard";
     if(page==="audit"&&!initData.isHr)page="dashboard";
+    if(page==="guide")renderGuide();
     activePage=page;
     document.querySelectorAll(".page").forEach(function(el){el.classList.toggle("hidden",el.id!=="page-"+page);});
     document.querySelectorAll(".nav-btn[data-page]").forEach(function(el){el.classList.toggle("active",el.dataset.page===page);});
     if(page==="swaps")loadSwaps();
     if(page==="audit")loadAudit();
+    if(page==="admin")loadDownlinerRequests();
   }
   function configureForms(){
+    var classes=initData.classes||["National","Expat","Contract"];
+    $("activeClassSelect").innerHTML=classes.map(function(name){return '<option value="'+esc(name)+'">'+esc(name)+'</option>';}).join("");
+    $("activeClassSelect").value=initData.activeClass||"National";
     var roles=initData.roles||[];
     $("activeRoleWrap").classList.toggle("hidden",roles.length<2);
     $("activeRoleSelect").innerHTML=roles.map(function(role){return '<option value="'+esc(role)+'">'+esc(role)+'</option>';}).join("");
     $("activeRoleSelect").value=initData.activeRole||roles[0]||"";
     $("profileRole").textContent="Active role: "+(initData.activeRole||roles[0]||"Employee");
+    $("navSchedule").classList.toggle("hidden",!initData.canSchedule);
+    $("navAdmin").classList.toggle("hidden",!initData.isHr);
+    $("navAudit").classList.toggle("hidden",!initData.isHr);
+    $("manageDownlinersButton").classList.toggle("hidden",!initData.canRequestDownliners);
+    $("scheduleForm").classList.toggle("hidden",!initData.canSchedule);
+
     var patterns=initData.patterns||[];
-    ["schedulePattern","changePattern"].forEach(function(id){
-      $(id).innerHTML=patterns.map(function(p){return '<option value="'+esc(p.name)+'">'+esc(p.name)+' — '+esc(p.sequence)+'</option>';}).join("");
-    });
-    var team=initData.team||[];
-    var options=team.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';}).join("");
-    var shifts=initData.shifts||[];
-    $("dateEntryShift").innerHTML='<option value="">Select shift…</option>'+shifts.map(function(s){
-      var timing=s.in?(s.in+"–"+s.out+" WAT"):"No shift hours";
-      return '<option value="'+esc(s.code)+'">'+esc(s.code+" · "+s.label+" — "+timing)+'</option>';
+    $("schedulePattern").innerHTML=patterns.map(function(p){return '<option value="'+esc(p.name)+'">'+esc(p.name)+' — '+esc(p.sequence)+'</option>';}).join("");
+    var team=(initData.team||[]).slice().sort(function(a,b){return String(a.empId).localeCompare(String(b.empId),undefined,{numeric:true,sensitivity:"base"});});
+    var employeeOptions=team.map(function(e){
+      return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId)+' ['+(e.employeeClass||"Class unknown")+']')+'</option>';
     }).join("");
-    $("scheduleEmployees").innerHTML=options;
-    $("changeEmployees").innerHTML=options;
+    $("scheduleEmployees").innerHTML=employeeOptions;
+
+    var classEmployees=(initData.classEmployees||[]).slice().sort(function(a,b){return String(a.empId).localeCompare(String(b.empId),undefined,{numeric:true,sensitivity:"base"});});
+    var teamIds=team.map(function(e){return String(e.empId);});
+    var currentCandidates=classEmployees.filter(function(e){return String(e.empId)!==String(user.empId)&&teamIds.indexOf(String(e.empId))<0;});
+    $("downlinerEmployee").innerHTML='<option value="">Select employee…</option>'+currentCandidates.map(function(e){
+      return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
+    }).join("");
+
     var partners=initData.swapPartners||[];
     $("swapPartner").innerHTML='<option value="">Select colleague…</option>'+partners.map(function(e){
-      return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+')</option>';
+      return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId))+'</option>';
     }).join("");
-    $("swapPartnerHelp").textContent=partners.length?"Eligible colleagues: "+partners.length:"No eligible partners found. Check the SIC and L1 Manager columns in Emp_List.";
+    $("swapPartnerHelp").textContent=partners.length?
+      "Eligible colleagues in class "+initData.activeClass+": "+partners.length:
+      "No eligible swap partners in "+initData.activeClass+". Swaps are only allowed within the same employee class.";
+
     $("scheduleStart").min=nextDate(initData.today);
-    $("changeEffective").min=initData.activeRole==="HR"?"":initData.today;
-    $("dateEntryDate").min=initData.activeRole==="HR"?"":initData.today;
-    $("dateEntryDate").value=initData.today;
     $("swapDate").min=initData.today;
     $("rosterStartDate").value=initData.monthStart;
     $("rosterEndDate").value=initData.monthEnd;
     $("exportStartDate").value=initData.monthStart;
     $("exportEndDate").value=initData.monthEnd;
+
+    var shiftCodes=initData.shifts||[];
+    $("rosterShiftToolbar").innerHTML='<span class="toolbar-title">SET SELECTED CELL(S)</span>'+
+      shiftCodes.map(function(s){
+        var timing=s.in?(s.in+"–"+s.out+" WAT"):"No shift hours";
+        return '<button type="button" class="shift-code-button" data-set-shift="'+esc(s.code)+'" title="'+esc(s.label+" — "+timing)+'">'+esc(s.code)+'</button>';
+      }).join("")+
+      '<span class="selected-count" id="rosterSelectionCount">0 cells selected</span>';
+
+    renderCurrentDownliners();
     applyEmployeeFilters();
+    renderGuide();
     if(initData.isHr){
       api("getAdminEmployeeList",[token],function(list){
-        var allOptions=list.map(function(e){return '<option value="'+esc(e.empId)+'">'+esc(e.name||e.empId)+' ('+esc(e.empId)+') · '+esc(e.role||'Employee')+'</option>';}).join("");
+        var allOptions=list.map(function(e){
+          return '<option value="'+esc(e.empId)+'">'+esc(e.empId+' — '+(e.name||e.empId)+' · '+(e.role||'Employee'))+'</option>';
+        }).join("");
         $("adminEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
         $("provisionEmployee").innerHTML='<option value="">Select employee…</option>'+allOptions;
         applyEmployeeFilters();
+        if(activePage==="admin")loadDownlinerRequests();
       });
     }
   }
