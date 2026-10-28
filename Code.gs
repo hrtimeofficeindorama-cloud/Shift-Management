@@ -99,8 +99,8 @@ function syncEmployeeRecords() {
         empName = getValue(row, getColIdx(["Emp Name"]));
         category = "Trainee";
         classVal = "National";
-        phoneNumber = "";
-        officialEmail = getValue(row, getColIdx(["Phone Number"]));
+        phoneNumber = getValue(row, getColIdx(["Phone Number"]));
+        officialEmail = "";
         personalEmail = getValue(row, getColIdx(["Email"]));
         businessUnit = getValue(row, getColIdx(["Business Unit"]));
         functionVal = "";
