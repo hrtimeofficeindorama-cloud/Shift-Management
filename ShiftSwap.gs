@@ -44,10 +44,10 @@ function submitShiftSwap(token, partnerEmpId, shiftDate, comment) {
     "Completed At": "",
     "Comments": String(comment || "")
   }]);
-  sendEmployeeNotice_(partner, "Shift swap approval requested",
-    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shift with you on " + date +
+  sendSwapActionNotice_(partner, requestId, "Partner", "Shift swap approval requested",
+    employeeName_(requester) + " (" + employeeId_(requester) + ") has requested to exchange shifts with you on " + date +
     ". Your shift: " + partnerShift + "; requester shift: " + requesterShift +
-    ". Sign in to Shift Management to accept or decline.");
+    ". Review the request and choose Accept or Decline below.");
   addAudit_(ctx.empId, "SHIFT_SWAP_SUBMITTED", [employeeId_(requester), employeeId_(partner)], [date],
     { requester: requesterShift, partner: partnerShift }, "",
     { requestId: requestId, comment: String(comment || "") }, "Pending Partner");
@@ -103,6 +103,9 @@ function getMySwapRequests(token) {
 
 function respondToSwapPartner(token, requestId, decision, comment) {
   var ctx = requireFullSession_(token);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   decision = String(decision || "").toLowerCase();
   if (decision !== "accept" && decision !== "decline") throw new Error("Choose accept or decline.");
   var rec = findSwap_(requestId);
@@ -134,16 +137,25 @@ function respondToSwapPartner(token, requestId, decision, comment) {
     "SIC Decisions JSON": JSON.stringify(sicDec), "Manager Decisions JSON": JSON.stringify(mgrDec),
     "Comments": appendComment_(rec.Comments, comment)
   });
-  sicIds.concat(mgrIds).filter(function(id, idx, arr) { return arr.indexOf(id) === idx; }).forEach(function(id) {
+  sicIds.forEach(function(id) {
     var approver = findEmployeeById_(id);
-    if (approver) sendEmployeeNotice_(approver, "Shift swap requires approval",
+    if (approver) sendSwapActionNotice_(approver, requestId, "SIC", "Shift swap requires SIC approval",
       employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
-      normalizeSheetDate_(rec["Shift Date"]) + ". Please sign in to review it.");
+      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
+  });
+  mgrIds.forEach(function(id) {
+    var approver = findEmployeeById_(id);
+    if (approver) sendSwapActionNotice_(approver, requestId, "L1 Manager", "Shift swap requires L1 Manager approval",
+      employeeName_(requester) + " and " + employeeName_(partner) + " accepted a request to swap shifts on " +
+      normalizeSheetDate_(rec["Shift Date"]) + ". Please review the shift details and choose Approve or Reject below.");
   });
   sendEmployeeNotice_(requester, "Shift swap accepted by colleague", employeeName_(partner) + " accepted the request. It has been routed to the SIC(s) and L1 Manager(s) for approval.");
   addAudit_(ctx.empId, "SHIFT_SWAP_PARTNER_ACCEPTED", [employeeId_(requester), employeeId_(partner)], [normalizeSheetDate_(rec["Shift Date"])],
     "", "", { requestId: requestId, comment: comment || "" }, "Pending Approvals");
   return { success: true, message: "Partner accepted. The request is now with the SIC(s) and L1 Manager(s)." };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function decideSwapApproval(token, requestId, approverType, decision, comment) {
@@ -270,4 +282,313 @@ function appendComment_(existing, comment) {
   if (!addition) return String(existing || "");
   var stamp = Utilities.formatDate(new Date(), SHIFT_APP_CONFIG.TIME_ZONE, "yyyy-MM-dd HH:mm");
   return (String(existing || "").trim() ? String(existing).trim() + "\n" : "") + "[" + stamp + "] " + addition;
+}
+
+/**
+ * Email approvals use short-lived, single-use bearer links. Opening a link only
+ * displays a confirmation page; a person must explicitly confirm the decision.
+ */
+var SWAP_EMAIL_APPROVAL_TTL_HOURS = 72;
+
+function sendSwapActionNotice_(emp, requestId, approverType, subject, body) {
+  var links = createSwapApprovalLinks_(requestId, employeeId_(emp), approverType);
+  var message = body;
+  if (!links.length) {
+    message += "\n\nThe approval link could not be generated. Sign in to Shift Management to review this request.";
+  }
+  sendEmployeeNotice_(emp, subject, message, links);
+}
+
+function createSwapApprovalLinks_(requestId, approverId, approverType) {
+  try { tableSheet_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS); }
+  catch (setupError) {
+    console.error("Email approval link storage is not set up. Run setupShiftManagement(): " + setupError.message);
+    return [];
+  }
+  var appUrl = "";
+  try { appUrl = String(ScriptApp.getService().getUrl() || "").trim(); } catch (err) {}
+  if (!appUrl) return [];
+  var decisions = approverType === "Partner" ? ["accept", "decline"] : ["approve", "reject"];
+  var now = new Date();
+  return decisions.map(function(decision) {
+    var token = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
+    var url = appUrl + (appUrl.indexOf("?") >= 0 ? "&" : "?") + "approvalToken=" + encodeURIComponent(token);
+    var label = decision === "accept" ? "Accept" : decision === "decline" ? "Decline" :
+      decision === "approve" ? "Approve" : "Reject";
+    appendObjects_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS, [{
+      "Link ID": Utilities.getUuid(),
+      "Token Hash": sha256Text_(token),
+      "Request ID": String(requestId),
+      "Approver ID": String(approverId),
+      "Approver Type": String(approverType),
+      "Decision": decision,
+      "Expires At": new Date(now.getTime() + SWAP_EMAIL_APPROVAL_TTL_HOURS * 60 * 60 * 1000),
+      "Status": "Pending",
+      "Created At": now,
+      "Used At": ""
+    }]);
+    return { label: label, decision: decision, url: url };
+  });
+}
+
+function getEmailApprovalPreview(token) {
+  var link = findEmailApprovalLinkByToken_(token);
+  var rec = findSwap_(String(link["Request ID"] || ""));
+  validateEmailApprovalContext_(link, rec);
+  var requester = findEmployeeById_(String(rec["Requester ID"]));
+  var partner = findEmployeeById_(String(rec["Partner ID"]));
+  var decision = String(link.Decision || "");
+  return {
+    actionLabel: decision === "accept" ? "Accept shift swap" :
+      decision === "decline" ? "Decline shift swap" :
+      decision === "approve" ? "Approve shift swap" : "Reject shift swap",
+    confirmButtonLabel: decision === "accept" ? "Confirm Accept" :
+      decision === "decline" ? "Confirm Decline" :
+      decision === "approve" ? "Confirm Approve" : "Confirm Reject",
+    isNegative: decision === "reject" || decision === "decline",
+    requestId: String(rec["Request ID"]),
+    requesterId: String(rec["Requester ID"]),
+    requesterName: requester ? employeeName_(requester) : String(rec["Requester ID"]),
+    partnerId: String(rec["Partner ID"]),
+    partnerName: partner ? employeeName_(partner) : String(rec["Partner ID"]),
+    date: normalizeSheetDate_(rec["Shift Date"]),
+    requesterShift: String(rec["Requester Original Shift"] || ""),
+    partnerShift: String(rec["Partner Original Shift"] || ""),
+    approverTypeLabel: String(link["Approver Type"]) === "Partner" ? "Selected swap partner" : String(link["Approver Type"])
+  };
+}
+
+function processEmailApproval(token) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var link = findEmailApprovalLinkByToken_(token);
+    var requestId = String(link["Request ID"] || "");
+    var rec = findSwap_(requestId);
+    validateEmailApprovalContext_(link, rec);
+
+    var actorId = String(link["Approver ID"] || "");
+    var type = String(link["Approver Type"] || "");
+    var decision = String(link.Decision || "");
+    var message;
+    if (type === "Partner") {
+      message = processPartnerDecisionFromEmail_(actorId, rec, decision);
+    } else {
+      message = processManagementDecisionFromEmail_(actorId, rec, type, decision);
+    }
+
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS, "Link ID", link["Link ID"], {
+      "Status": "Used", "Used At": new Date()
+    });
+    updateEmailApprovalLinkStatuses_(function(row) {
+      return String(row["Link ID"]) !== String(link["Link ID"]) &&
+        String(row["Request ID"]) === requestId &&
+        String(row["Approver ID"]) === actorId &&
+        String(row["Approver Type"]) === type &&
+        String(row.Status || "") === "Pending";
+    }, "Superseded");
+
+    var latest = findSwap_(requestId);
+    if (["Pending Partner", "Pending Approvals"].indexOf(String(latest.Status || "")) < 0) {
+      updateEmailApprovalLinkStatuses_(function(row) {
+        return String(row["Request ID"]) === requestId && String(row.Status || "") === "Pending";
+      }, "Revoked");
+    }
+    return { success: true, message: message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findEmailApprovalLinkByToken_(token) {
+  token = String(token || "").trim();
+  if (!/^[a-f0-9]{64}$/i.test(token)) throw new Error("This approval link is invalid or incomplete.");
+  var tokenHash = sha256Text_(token);
+  var rows = getTableRows_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS);
+  var link = rows.find(function(row) {
+    return constantTimeEquals_(String(row["Token Hash"] || ""), tokenHash);
+  });
+  if (!link) throw new Error("This approval link is invalid. Ask the requester to resend the notification.");
+  if (String(link.Status || "") !== "Pending") throw new Error("This approval link has already been used or cancelled.");
+  var expires = link["Expires At"] instanceof Date ? link["Expires At"].getTime() : new Date(link["Expires At"]).getTime();
+  if (!expires || expires < new Date().getTime()) {
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS, "Link ID", link["Link ID"], { "Status": "Expired" });
+    throw new Error("This approval link has expired. Ask the requester to resend the notification.");
+  }
+  return link;
+}
+
+function validateEmailApprovalContext_(link, rec) {
+  var type = String(link["Approver Type"] || "");
+  var decision = String(link.Decision || "");
+  var actorId = String(link["Approver ID"] || "");
+  if (!rec || !actorId) throw new Error("The approval request could not be found.");
+  if (type === "Partner") {
+    if (["accept", "decline"].indexOf(decision) < 0) throw new Error("Invalid partner decision link.");
+    if (String(rec["Partner ID"] || "") !== actorId || String(rec.Status || "") !== "Pending Partner") {
+      throw new Error("This request is no longer awaiting the selected colleague's response.");
+    }
+    return true;
+  }
+  if (["SIC", "L1 Manager"].indexOf(type) < 0 || ["approve", "reject"].indexOf(decision) < 0) {
+    throw new Error("Invalid management approval link.");
+  }
+  if (String(rec.Status || "") !== "Pending Approvals") {
+    throw new Error("This request is no longer awaiting management approval.");
+  }
+  var approver = findEmployeeById_(actorId);
+  if (!approver || !hasRole_(approver, type)) throw new Error("Your assigned approver role has changed. Ask HR to review this request.");
+  var ids = splitIds_(rec[type === "SIC" ? "SIC Approver IDs" : "Manager Approver IDs"]);
+  if (ids.indexOf(actorId) < 0) throw new Error("You are not an assigned approver for this request.");
+  var decisions = parseJsonObject_(rec[type === "SIC" ? "SIC Decisions JSON" : "Manager Decisions JSON"]);
+  if (decisions[actorId] && decisions[actorId] !== "Pending") {
+    throw new Error("You have already made a decision on this request.");
+  }
+  return true;
+}
+
+function processPartnerDecisionFromEmail_(actorId, rec, decision) {
+  var requestId = String(rec["Request ID"]);
+  var requesterId = String(rec["Requester ID"]);
+  var partnerId = String(rec["Partner ID"]);
+  var requester = findEmployeeById_(requesterId);
+  var partner = findEmployeeById_(partnerId);
+  var date = normalizeSheetDate_(rec["Shift Date"]);
+  if (decision === "decline") {
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+      "Status": "Declined by Partner", "Partner Decision": "Declined",
+      "Partner Responded At": new Date(),
+      "Completed At": new Date(),
+      "Comments": appendComment_(rec.Comments, "Partner declined via email approval link")
+    });
+    if (requester && partner) sendEmployeeNotice_(requester, "Shift swap declined",
+      employeeName_(partner) + " declined your shift swap for " + date + ".");
+    addAudit_(actorId, "SHIFT_SWAP_PARTNER_DECLINED", [requesterId, partnerId], [date],
+      { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
+      { requestId: requestId, method: "Email approval link" }, "Declined");
+    return "The request was declined. Neither employee's shift was changed.";
+  }
+
+  var sicIds = splitIds_(rec["SIC Approver IDs"]);
+  var mgrIds = splitIds_(rec["Manager Approver IDs"]);
+  if (!sicIds.length || !mgrIds.length) throw new Error("Required SIC and L1 Manager approvers are missing. Ask HR to correct the hierarchy.");
+  var sicDecisions = {};
+  var managerDecisions = {};
+  sicIds.forEach(function(id) { sicDecisions[id] = "Pending"; });
+  mgrIds.forEach(function(id) { managerDecisions[id] = "Pending"; });
+  updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+    "Status": "Pending Approvals", "Partner Decision": "Accepted",
+    "Partner Responded At": new Date(),
+    "SIC Decisions JSON": JSON.stringify(sicDecisions),
+    "Manager Decisions JSON": JSON.stringify(managerDecisions),
+    "Comments": appendComment_(rec.Comments, "Partner accepted via email approval link")
+  });
+  sicIds.forEach(function(id) {
+    var approver = findEmployeeById_(id);
+    if (approver) sendSwapActionNotice_(approver, requestId, "SIC", "Shift swap requires SIC approval",
+      employeeName_(requester || { "Emp ID": requesterId }) + " and " +
+      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + date +
+      ". Please review the shift details and choose Approve or Reject below.");
+  });
+  mgrIds.forEach(function(id) {
+    var approver = findEmployeeById_(id);
+    if (approver) sendSwapActionNotice_(approver, requestId, "L1 Manager", "Shift swap requires L1 Manager approval",
+      employeeName_(requester || { "Emp ID": requesterId }) + " and " +
+      employeeName_(partner || { "Emp ID": partnerId }) + " accepted a request to swap shifts on " + date +
+      ". Please review the shift details and choose Approve or Reject below.");
+  });
+  if (requester) sendEmployeeNotice_(requester, "Shift swap accepted by colleague",
+    employeeName_(partner || { "Emp ID": partnerId }) + " accepted the request. It has been routed to the SIC(s) and L1 Manager(s) for approval.");
+  addAudit_(actorId, "SHIFT_SWAP_PARTNER_ACCEPTED", [requesterId, partnerId], [date],
+    "", "", { requestId: requestId, method: "Email approval link" }, "Pending Approvals");
+  return "The swap request was accepted and sent to the SIC(s) and L1 Manager(s) for approval.";
+}
+
+function processManagementDecisionFromEmail_(actorId, rec, approverType, decision) {
+  var requestId = String(rec["Request ID"]);
+  var requesterId = String(rec["Requester ID"]);
+  var partnerId = String(rec["Partner ID"]);
+  var requester = findEmployeeById_(requesterId);
+  var partner = findEmployeeById_(partnerId);
+  var date = normalizeSheetDate_(rec["Shift Date"]);
+  var field = approverType === "SIC" ? "SIC Decisions JSON" : "Manager Decisions JSON";
+  var decisions = parseJsonObject_(rec[field]);
+  decisions[actorId] = decision === "approve" ? "Approved" : "Rejected";
+
+  if (decision === "reject") {
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+      [field]: JSON.stringify(decisions),
+      "Status": "Rejected by " + approverType,
+      "Completed At": new Date(),
+      "Comments": appendComment_(rec.Comments, approverType + " rejected via email approval link")
+    });
+    [requester, partner].forEach(function(emp) {
+      if (emp) sendEmployeeNotice_(emp, "Shift swap rejected",
+        "The shift swap request for " + date + " was rejected by an approver (" + approverType + "). Neither roster was changed.");
+    });
+    addAudit_(actorId, "SHIFT_SWAP_REJECTED", [requesterId, partnerId], [date],
+      { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] }, "",
+      { requestId: requestId, approverType: approverType, method: "Email approval link" }, "Rejected");
+    return "The request was rejected. Neither employee's shift was changed.";
+  }
+
+  updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+    [field]: JSON.stringify(decisions),
+    "Comments": appendComment_(rec.Comments, approverType + " approved via email approval link")
+  });
+  rec[field] = JSON.stringify(decisions);
+  var allSicApproved = allApproved_(splitIds_(rec["SIC Approver IDs"]), parseJsonObject_(rec["SIC Decisions JSON"]));
+  var allMgrApproved = allApproved_(splitIds_(rec["Manager Approver IDs"]), parseJsonObject_(rec["Manager Decisions JSON"]));
+  addAudit_(actorId, "SHIFT_SWAP_APPROVAL_RECORDED", [requesterId, partnerId], [date], "", "",
+    { requestId: requestId, approverType: approverType, decision: "Approved", method: "Email approval link" },
+    "Approval recorded");
+
+  if (allSicApproved && allMgrApproved) {
+    if (!requester || !partner) throw new Error("One of the employees could not be located; HR must review this request.");
+    var currentReq = getShiftForDate_(requesterId, date);
+    var currentPar = getShiftForDate_(partnerId, date);
+    if (currentReq !== String(rec["Requester Original Shift"]) || currentPar !== String(rec["Partner Original Shift"])) {
+      updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+        "Status": "Needs Review - Shifts Changed", "Completed At": new Date()
+      });
+      [requester, partner].forEach(function(emp) {
+        sendEmployeeNotice_(emp, "Shift swap needs review",
+          "A roster entry changed while the swap was awaiting approval for " + date + ". The swap was not applied; contact HR/SIC.");
+      });
+      addAudit_(actorId, "SHIFT_SWAP_NEEDS_REVIEW", [requesterId, partnerId], [date],
+        { requester: rec["Requester Original Shift"], partner: rec["Partner Original Shift"] },
+        { requester: currentReq, partner: currentPar }, "Roster changed while request was pending", "Not applied");
+      return "Your approval was recorded, but the shifts changed while the request was pending. The swap was not applied and needs review.";
+    }
+    appendObjects_(SHIFT_APP_CONFIG.TABLES.OVERRIDES, [
+      { "Override ID": Utilities.getUuid(), "Emp ID": requesterId, "Shift Date": date,
+        "Shift Code": currentPar, "Source": "Approved Swap", "Reason": "Approved shift swap",
+        "Related Request ID": requestId, "Created By": actorId, "Created At": new Date(),
+        "Previous Shift": currentReq, "Status": "Active" },
+      { "Override ID": Utilities.getUuid(), "Emp ID": partnerId, "Shift Date": date,
+        "Shift Code": currentReq, "Source": "Approved Swap", "Reason": "Approved shift swap",
+        "Related Request ID": requestId, "Created By": actorId, "Created At": new Date(),
+        "Previous Shift": currentPar, "Status": "Active" }
+    ]);
+    updateTableRecord_(SHIFT_APP_CONFIG.TABLES.SWAPS, "Request ID", requestId, {
+      "Status": "Approved and Applied", "Completed At": new Date()
+    });
+    [requester, partner].forEach(function(emp) {
+      sendEmployeeNotice_(emp, "Shift swap approved",
+        "Your shift swap for " + date + " was approved and applied. The shifts were exchanged for that date only.");
+    });
+    addAudit_(actorId, "SHIFT_SWAP_APPLIED", [requesterId, partnerId], [date],
+      { requester: currentReq, partner: currentPar }, { requester: currentPar, partner: currentReq },
+      { requestId: requestId, method: "Email approval link" }, "Success");
+    return "All required approvals are complete. The shifts were exchanged for the selected date only.";
+  }
+  return "Your approval was recorded. The swap remains pending other required approvals.";
+}
+
+function updateEmailApprovalLinkStatuses_(predicate, status) {
+  getTableRows_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS).forEach(function(row) {
+    if (predicate(row)) {
+      updateTableRecord_(SHIFT_APP_CONFIG.TABLES.APPROVAL_LINKS, "Link ID", row["Link ID"], { "Status": status });
+    }
+  });
 }

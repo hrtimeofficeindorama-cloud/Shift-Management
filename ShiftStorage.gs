@@ -20,6 +20,14 @@ SHIFT_TABLE_HEADERS["Shift_Audit"] = [
   "Audit ID", "Actor ID", "Action", "Employee IDs", "Effective Dates",
   "Old Values", "New Values", "Details", "Timestamp", "Outcome"
 ];
+SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
+  "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
+  "Expires At", "Status", "Created At", "Used At"
+];
+SHIFT_TABLE_HEADERS["Shift_Swap_Approval_Links"] = [
+  "Link ID", "Token Hash", "Request ID", "Approver ID", "Approver Type", "Decision",
+  "Expires At", "Status", "Created At", "Used At"
+];
 
 function ensureAllTables_() {
   var ss = SpreadsheetApp.openById(SHIFT_APP_CONFIG.SPREADSHEET_ID);
@@ -351,18 +359,43 @@ function addAudit_(actorId, action, employeeIds, dates, oldValues, newValues, de
   }]);
 }
 
-function sendEmployeeNotice_(emp, subject, body) {
+function sendEmployeeNotice_(emp, subject, body, actionLinks) {
   var emails = employeeEmails_(emp);
   if (!emails.length) return;
-  try {
-    MailApp.sendEmail({
-      to: emails[0],
-      subject: "[Shift Management] " + subject,
-      body: body + "\n\nThis is an automated notification from Shift Management."
+  var plainBody = String(body || "") + "\n\nThis is an automated notification from Shift Management.";
+  var options = {
+    to: emails[0],
+    subject: "[Shift Management] " + subject,
+    body: plainBody,
+    name: "Shift Management"
+  };
+  if (Array.isArray(actionLinks) && actionLinks.length) {
+    var html = '<div style="font-family:Arial,sans-serif;color:#243b53;line-height:1.6;max-width:640px">' +
+      '<p>' + escapeHtmlForEmail_(body).replace(/\r?\n/g, "<br>") + '</p>' +
+      '<p style="margin:24px 0 10px"><strong>Choose an action:</strong></p><div>';
+    actionLinks.forEach(function(link) {
+      var color = link.decision === "reject" || link.decision === "decline" ? "#a12626" : "#176b87";
+      html += '<a href="' + escapeHtmlForEmail_(link.url) + '" style="display:inline-block;margin:0 10px 10px 0;padding:11px 18px;background:' +
+        color + ';color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">' +
+        escapeHtmlForEmail_(link.label) + '</a>';
+      plainBody += "\n\n" + link.label + ": " + link.url;
     });
+    html += '</div><p style="font-size:12px;color:#627d98">For security, opening a link displays a confirmation page. The decision is recorded only when you confirm it there. The links expire after 72 hours and can be used once.</p>' +
+      '<p style="font-size:12px;color:#627d98">Shift Management</p></div>';
+    options.body = plainBody;
+    options.htmlBody = html;
+  }
+  try {
+    MailApp.sendEmail(options);
   } catch (err) {
     console.error("Unable to send notification to " + employeeId_(emp) + ": " + err.message);
   }
+}
+
+function escapeHtmlForEmail_(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function createRosterGrid_(employees, fromDate, toDate) {
