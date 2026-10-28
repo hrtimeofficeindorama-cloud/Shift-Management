@@ -157,7 +157,7 @@
               <div class="downliner-panel hidden" id="downlinerManager">
                 <div class="card-head"><div><h2>Manage downliners</h2><p>Search employees in the selected class. New relationships require HR approval; removals take effect immediately.</p></div><button class="secondary" type="button" id="closeDownlinerManager">Close</button></div>
                 <form id="downlinerRequestForm">
-                  <div class="field"><label for="downlinerEmployeeSearch">Search employee name or ID</label><input id="downlinerEmployeeSearch" type="search" placeholder="Filter selected-class employees"></div>
+                  <div class="field"><label for="downlinerEmployeeSearch">Search employee name or ID</label><input id="downlinerEmployeeSearch" class="employee-search" data-filter-target="downlinerEmployee" type="search" placeholder="Filter selected-class employees"></div>
                   <div class="field"><label for="downlinerEmployee">Employee</label><select id="downlinerEmployee" required></select></div>
                   <div class="field"><label for="downlinerComment">Reason (optional)</label><input id="downlinerComment" maxlength="400" placeholder="Reason for this additional reporting relationship"></div>
                   <div class="actions"><button type="submit" id="submitDownlinerRequest">Submit to HR for approval</button></div>
@@ -1040,6 +1040,9 @@
 
   document.addEventListener("input",function(e){
     if(e.target&&e.target.matches(".employee-search[data-filter-target]"))filterEmployeeSelect(e.target);
+  });
+  document.addEventListener("change",function(e){
+    if(e.target&&e.target.matches("input[type=checkbox][data-employee-select]"))handleEmployeeChecklistChange(e.target);
   });
   document.addEventListener("click",function(e){
     var toggle=e.target.closest("button[data-toggle-password]");if(!toggle)return;
