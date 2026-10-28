@@ -530,10 +530,36 @@
     var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+1);
     return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   }
+  function formatDateDisplay(value){
+    var text=String(value===null||value===undefined?"":value).trim();
+    var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+    if(!m)return text;
+    var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return m[3]+"/"+months[Number(m[2])-1]+"/"+m[1]+text.slice(10);
+  }
+  function formatDateList(value){
+    return String(value||"").split(",").map(function(item){return formatDateDisplay(item.trim());}).join(", ");
+  }
+  function normalizeClientIdentity(value){
+    return String(value||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  }
+  function currentUserReferences(value){
+    var ids=[user&&user.empId,user&&user.name,user&&user.officialEmail].map(normalizeClientIdentity).filter(Boolean);
+    return String(value||"").split(/[,;|]/).some(function(part){return ids.indexOf(normalizeClientIdentity(part))>=0;});
+  }
+  function rowEditable(employee){
+    var role=initData&&initData.activeRole;
+    if(role==="HR")return !!initData.isHr;
+    if(role==="Employee")return String(employee.empId)===String(user.empId);
+    if(role==="SIC")return String(employee.empId)===String(user.empId)||currentUserReferences(employee.sic);
+    if(role==="L1 Manager")return String(employee.empId)===String(user.empId)||currentUserReferences(employee.manager);
+    return false;
+  }
   function loadDashboard(){
     var start=$("rosterStartDate").value||initData.monthStart;
     var end=$("rosterEndDate").value||initData.monthEnd;
     if(start>end){toast("End date must be on or after start date.","error");return;}
+    selectedRosterCells={};rosterSelectionAnchor=null;
     api("getDashboardData",[token,start,end],function(data){
       dashboard=data;
       $("metricShift").textContent=data.currentShift;
@@ -541,25 +567,158 @@
       $("metricShiftLabel").textContent=shift?(shift.label+(shift.in?" · "+shift.in+"–"+shift.out:"")):"Current roster assignment";
       $("metricTeam").textContent=(data.roster.rows||[]).length;
       $("metricSwaps").textContent=(data.swaps||[]).filter(function(s){return s.canRespondAsPartner||s.canApproveAsSic||s.canApproveAsManager||(["Pending Partner","Pending Approvals"].indexOf(s.status)>=0&&s.isRequester);}).length;
+      $("todayChip").textContent="Today · "+formatDateDisplay(data.today);
       renderRoster(data.roster);
     });
   }
   function renderRoster(roster){
-    if(!roster||!roster.dates||!roster.rows){$("rosterTable").innerHTML='<div class="empty">No roster is available.</div>';return;}
-    if(!roster.rows.length){$("rosterTable").innerHTML='<div class="empty">No employees are assigned under your access. Your personal roster is shown when available.</div>';return;}
-    var html='<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Emp ID</th>';
-    roster.dates.forEach(function(date){html+='<th>'+esc(date.slice(5))+'</th>';});
+    if(!roster||!roster.dates||!roster.rows){
+      $("rosterTable").innerHTML='<div class="empty">No roster is available.</div>';initRosterSlider();return;
+    }
+    activeRosterRows=roster.rows;activeRosterDates=roster.dates;
+    if(!roster.rows.length){
+      $("rosterTable").innerHTML='<div class="empty">No employees are assigned under this role and class. Use Add / remove downliners if the assignment is missing, or choose another class above.</div>';
+      updateRosterSelectionCount();initRosterSlider();return;
+    }
+    var html='<div class="roster-table-wrap" id="rosterScrollWrap"><table><thead><tr><th class="sticky-id" style="min-width:110px;width:110px">Emp ID</th><th class="sticky-name" style="min-width:170px;width:170px">Emp Name</th>';
+    roster.dates.forEach(function(date){html+='<th title="'+esc(formatDateDisplay(date))+'">'+esc(formatDateDisplay(date))+'</th>';});
     html+='</tr></thead><tbody>';
-    roster.rows.forEach(function(row){
-      html+='<tr><td>'+esc(row.employee.name||"")+'</td><td>'+esc(row.employee.empId)+'</td>';
-      roster.dates.forEach(function(date){
-        var code=row.shifts[date]||"—";
-        html+='<td class="shift-cell '+(code!=="—"?"shift-"+esc(code):"")+'">'+esc(code)+'</td>';
+    roster.rows.forEach(function(row,rowIndex){
+      html+='<tr data-row-index="'+rowIndex+'"><td class="sticky-id">'+esc(row.employee.empId)+'</td><td class="sticky-name">'+esc(row.employee.name||"")+'</td>';
+      roster.dates.forEach(function(date,colIndex){
+        var code=String(row.shifts[date]||"").toUpperCase();
+        var editable=rowEditable(row.employee);
+        html+='<td class="shift-cell '+(code?"shift-"+esc(code):"")+'"><input type="text" class="roster-cell '+(code?"shift-"+esc(code):"")+'" value="'+esc(code)+'" placeholder="—" maxlength="1" pattern="(G|A|B|D|N|O)" autocomplete="off" autocapitalize="characters" aria-label="'+esc(row.employee.empId+" "+formatDateDisplay(date))+'" title="'+esc(row.employee.empId+" · "+formatDateDisplay(date)+(editable?" · Editable":" · Read only"))+'" data-emp-id="'+esc(row.employee.empId)+'" data-date="'+esc(date)+'" data-row-index="'+rowIndex+'" data-col-index="'+colIndex+'" data-original-code="'+esc(code)+'" '+(editable?"":"disabled")+'></td>';
       });
       html+='</tr>';
     });
-    html+='</tbody></table></div><div class="help">Roster dates use Africa/Lagos time. Pattern dates are calculated from their effective start date; one-day overrides take precedence on that date.</div>';
+    html+='</tbody></table></div>';
     $("rosterTable").innerHTML=html;
+    updateRosterSelectionCount();
+    initRosterSlider();
+  }
+  function initRosterSlider(){
+    var wrap=$("rosterScrollWrap"),slider=$("rosterHorizontalSlider");
+    if(!wrap||!slider){slider.value=0;slider.max=0;return;}
+    slider.max=Math.max(0,wrap.scrollWidth-wrap.clientWidth);
+    slider.value=wrap.scrollLeft;
+    $("rosterScrollLabel").textContent=formatDateDisplay($("rosterStartDate").value)+" → "+formatDateDisplay($("rosterEndDate").value);
+    wrap.onscroll=function(){
+      slider.value=wrap.scrollLeft;
+      slider.max=Math.max(0,wrap.scrollWidth-wrap.clientWidth);
+    };
+  }
+  function updateRosterSelectionCount(){
+    var count=Object.keys(selectedRosterCells).length;
+    var label=$("rosterSelectionCount");
+    if(label)label.textContent=count+" cell"+(count===1?"":"s")+" selected";
+    document.querySelectorAll(".roster-cell.selected").forEach(function(cell){cell.classList.remove("selected");});
+    Object.keys(selectedRosterCells).forEach(function(key){
+      var item=selectedRosterCells[key];
+      var cell=findRosterCell(item.empId,item.date);
+      if(cell)cell.classList.add("selected");
+    });
+  }
+  function rosterCellKey(empId,date){return String(empId)+"|"+String(date);}
+  function findRosterCell(empId,date){
+    var wrap=$("rosterTable");
+    if(!wrap)return null;
+    return Array.from(wrap.querySelectorAll(".roster-cell")).find(function(cell){
+      return cell.dataset.empId===String(empId)&&cell.dataset.date===String(date);
+    })||null;
+  }
+  function selectRosterCell(cell,extend){
+    if(!cell||cell.disabled)return;
+    var key=rosterCellKey(cell.dataset.empId,cell.dataset.date);
+    if(!extend)selectedRosterCells={};
+    selectedRosterCells[key]={empId:cell.dataset.empId,date:cell.dataset.date,rowIndex:Number(cell.dataset.rowIndex),colIndex:Number(cell.dataset.colIndex)};
+    rosterSelectionAnchor={rowIndex:Number(cell.dataset.rowIndex),colIndex:Number(cell.dataset.colIndex)};
+    updateRosterSelectionCount();
+  }
+  function selectRosterRange(anchor,target){
+    if(!anchor||!target)return;
+    selectedRosterCells={};
+    var minRow=Math.min(anchor.rowIndex,Number(target.dataset.rowIndex));
+    var maxRow=Math.max(anchor.rowIndex,Number(target.dataset.rowIndex));
+    var minCol=Math.min(anchor.colIndex,Number(target.dataset.colIndex));
+    var maxCol=Math.max(anchor.colIndex,Number(target.dataset.colIndex));
+    for(var r=minRow;r<=maxRow;r++){
+      for(var col=minCol;col<=maxCol;col++){
+        var cell=$("rosterTable").querySelector('.roster-cell[data-row-index="'+r+'"][data-col-index="'+col+'"]');
+        if(cell&&!cell.disabled){
+          var key=rosterCellKey(cell.dataset.empId,cell.dataset.date);
+          selectedRosterCells[key]={empId:cell.dataset.empId,date:cell.dataset.date,rowIndex:r,colIndex:col};
+        }
+      }
+    }
+    updateRosterSelectionCount();
+  }
+  function validateShiftCode(value){
+    return ["G","A","B","D","N","O"].indexOf(String(value||"").trim().toUpperCase())>=0;
+  }
+  function saveRosterEntries(entries,successMessage){
+    if(!entries||!entries.length)return;
+    api("updateRosterCells",[token,entries],function(result){
+      toast(successMessage||result.message,"success");
+      selectedRosterCells={};rosterSelectionAnchor=null;loadDashboard();
+    });
+  }
+  function applyShiftToSelectedCells(code){
+    if(!validateShiftCode(code)){toast("Choose a valid shift code: G, A, B, D, N or O.","error");return;}
+    var selected=Object.keys(selectedRosterCells).map(function(key){return selectedRosterCells[key];});
+    if(!selected.length){toast("Select one or more editable shift cells first.","error");return;}
+    var entries=[];
+    selected.forEach(function(item){
+      var cell=findRosterCell(item.empId,item.date);
+      if(cell&&!cell.disabled){cell.value=code;entries.push({empId:item.empId,date:item.date,shiftCode:code});}
+    });
+    saveRosterEntries(entries,entries.length+" shift cell(s) updated to "+code+".");
+  }
+  function renderCurrentDownliners(){
+    var wrap=$("currentDownliners");
+    if(!wrap||!initData)return;
+    var rows=(initData.team||[]).filter(function(e){return String(e.empId)!==String(user.empId);});
+    if(!rows.length){wrap.innerHTML='<div class="empty">No employees are currently assigned under this role in class '+esc(initData.activeClass)+'.</div>';return;}
+    wrap.innerHTML=rows.map(function(e){
+      return '<div class="downliner-row"><div class="details"><strong>'+esc(e.empId)+' — '+esc(e.name||e.empId)+'</strong><div class="muted">'+esc(e.employeeClass||initData.activeClass)+' · '+esc(initData.activeRole)+'</div></div><button type="button" class="danger" data-remove-downliner="'+esc(e.empId)+'">Remove from my list</button></div>';
+    }).join("");
+  }
+  function loadDownlinerRequests(){
+    if(!initData||!initData.isHr)return;
+    api("getDownlinerRequests",[token],function(requests){renderDownlinerRequests(requests);});
+  }
+  function renderDownlinerRequests(requests){
+    var wrap=$("downlinerRequestsList");
+    if(!wrap)return;
+    if(!requests||!requests.length){wrap.innerHTML='<div class="empty">No pending downliner requests for class '+esc(initData.activeClass)+'.</div>';return;}
+    var html='<div class="request-list">';
+    requests.forEach(function(r){
+      html+='<div class="request-card"><div class="request-title">'+esc(r.employeeId)+' — '+esc(r.employeeName)+'</div>'+
+        '<div class="request-meta">Requested by '+esc(r.requesterName)+' ('+esc(r.requesterId)+') as '+esc(r.relationshipType)+'<br>Class: '+esc(r.className)+' · Submitted: '+esc(r.createdAt)+'</div>'+
+        (r.comments?'<div class="request-meta">Reason: '+esc(r.comments)+'</div>':'')+
+        '<div class="request-actions"><button type="button" class="success" data-downliner-request="'+esc(r.requestId)+'" data-decision="approve">Approve assignment</button><button type="button" class="danger" data-downliner-request="'+esc(r.requestId)+'" data-decision="reject">Reject</button></div></div>';
+    });
+    wrap.innerHTML=html+'</div>';
+  }
+  function renderGuide(){
+    var wrap=$("guideContent");
+    if(!wrap||!initData)return;
+    var roles=initData.roles||["Employee"];
+    var common='<section class="guide-section"><h2>Getting started and account security</h2><ol>'+
+      '<li>Sign in with your employee ID or registered email and your password.</li>'+
+      '<li>If the app requests first-time setup, create a new password, confirm it, and set your recovery question and answer.</li>'+
+      '<li>Change your working view using the <strong>Class</strong> selector (National, Expat or Contract) and, when assigned multiple roles, the <strong>Role</strong> selector beside it. Class and role filters apply to the roster, scheduling, shift changes, swap queues and relevant administration lists.</li>'+
+      '<li>Use <strong>Account security</strong> to change your password or update your recovery question. Never share your password or approval links.</li>'+
+      '<li>Use <strong>Platform guide</strong> to read instructions for every role assigned to your account, even when another role is currently selected.</li>'+
+      '</ol></section>';
+    var guides={
+      "Employee":'<section class="guide-section"><h2>Employee guide</h2><ol><li>Open <strong>My roster</strong>. The default date range is the first through last day of the current month.</li><li>Choose any start and end date and select <strong>Apply date range</strong>. Scroll through date columns using the horizontal slider below the grid.</li><li>Your Emp ID appears before your name. Dates use DD/MMM/YYYY. Shift codes are G (General), A (Shift A), B (Shift B), D (Day Shift), N (Night Shift) and O (Off Day), with timings shown in the Shift Code key.</li><li>To edit your own shift, select your shift cell, type one valid code, and press Tab or move away from the cell. You can paste a rectangular block of valid shift codes into the grid. An invalid code is rejected by the server.</li><li>To exchange a shift with an eligible colleague, open <strong>Shift swaps</strong>, choose a colleague in the same class, select the date and submit the request. The other employee must accept, then all required SIC and L1 Manager approvals must be complete before shifts are exchanged.</li><li>Use <strong>Requests &amp; approvals</strong> to review the progress of your swap requests. You may also decide a swap from the action links in the email you receive.</li><li>Use <strong>Platform guide → Contact the developer / support team</strong> for suggestions, queries or issues.</li></ol></section>',
+      "SIC":'<section class="guide-section"><h2>SIC — Shift In-Charge guide</h2><ol><li>Set the Class selector to the employee class you need to manage. Only National, Expat or Contract employees in that class are listed.</li><li>In <strong>My roster</strong>, view employees assigned to you as SIC. Use the date range and horizontal slider for the desired period.</li><li>To change individual shifts, select a cell, type a valid shift code, paste a range from a spreadsheet, drag across cells to select a range, then click G, A, B, D, N or O above the table to apply a code to the selected cells. You may only edit employees under your SIC assignment and current/future dates; HR handles past-date corrections.</li><li>To schedule a recurring pattern, open <strong>Schedule &amp; change</strong>, search employees by ID or name, select one or more, choose a pattern and set an effective start date in the future.</li><li>To add an employee missing from your list, choose <strong>Add / remove downliners</strong>, search within the selected class and submit an assignment request. The employee becomes your downliner only after HR approves.</li><li>Remove a currently assigned employee through the same downliner panel. Removal affects only your SIC relationship; any other SIC relationship remains.</li><li>For swaps, the selected employee class must match both employees. Accept/reject or approve/reject using the email links or the Shift swaps screen; the roster updates only after every required approval.</li></ol></section>',
+      "L1 Manager":'<section class="guide-section"><h2>L1 Manager guide</h2><ol><li>Select the employee Class that you need to view, and open <strong>My roster</strong> to see direct employees listed under your L1 Manager relationship.</li><li>Use the date range and horizontal slider to view date columns. Emp ID is first, followed by Emp Name; visible dates use DD/MMM/YYYY.</li><li>Change individual shift cells by typing G, A, B, D, N or O, pasting a valid grid range, or selecting multiple cells and clicking a shift code above the grid. You can only change employees assigned under your manager relationship and cannot change past dates.</li><li>Use <strong>Schedule &amp; change</strong> to assign a recurring shift pattern to your downliners, using the employee name/ID search. New recurring patterns must start in the future.</li><li>If a required employee is missing, submit an additional L1 Manager relationship request from <strong>Add / remove downliners</strong>. HR must approve the request before it is added.</li><li>Review swap requests and approve/reject management approvals only when assigned as approver. Swaps cannot cross National, Expat and Contract classes.</li></ol></section>',
+      "HR":'<section class="guide-section"><h2>HR / Super Admin guide</h2><ol><li>Select National, Expat or Contract in the Class selector before managing that class. Class filtering is enforced by server-side checks for shift operations.</li><li>To schedule recurring patterns, open <strong>Schedule &amp; change</strong>, filter employees by name or ID, select the group, choose the shift pattern and set the future effective date.</li><li>To correct a particular date, edit it directly in My roster or paste a validated range of cells. HR can make past, current and future date corrections.</li><li>Review <strong>HR administration → Pending downliner requests</strong>. Approving appends the requester to the employee's SIC or L1 Manager field without removing current relationships; rejecting records the decision and comment. Check the selected class before processing requests.</li><li>Use HR administration to assign roles, reset individual passwords, reset all employee accounts, import CSV shift overrides, and export the selected class roster for a date range.</li><li>Export columns begin with Emp ID and Shift Type, then a column for each date. Missing shifts default to G on weekdays and O on weekends. Shift Type is S if any A, B, D or N occurs in the range; otherwise it is G.</li><li>Open <strong>Audit history</strong> to review changes. New audit records are stored in the separately configured audit spreadsheet; the setup function migrates legacy records without deleting the originals.</li><li>Use email action links to approve swaps without logging in, but confirm the decision on the opened page. Links are single-use and expire after 72 hours.</li></ol></section>'
+    };
+    var visible=roles.filter(function(role){return !!guides[role];});
+    wrap.innerHTML=common+(visible.length?visible.map(function(role){return guides[role];}).join(""):'<section class="guide-section"><h2>Role guide</h2><p>No detailed guide is configured for the roles currently assigned to your account.</p></section>');
   }
   function selectedValues(id){
     return Array.from($(id).selectedOptions).map(function(o){return o.value;}).filter(Boolean);
