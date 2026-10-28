@@ -228,6 +228,9 @@ function setActiveClass(token, requestedClass) {
   if ((SHIFT_APP_CONFIG.CLASSES || []).indexOf(selected) < 0) {
     throw new Error("Select a valid employee class.");
   }
+  if (ctx.activeRole === "Employee" && selected !== employeeClass_(ctx.employee)) {
+    throw new Error("Employees can only use the class assigned to their own employee record.");
+  }
   var cache = CacheService.getScriptCache();
   var key = "SHIFT_SESSION_" + sha256Text_(String(token));
   var raw = cache.get(key);
@@ -270,8 +273,10 @@ function getAuthContext_(token) {
   var activeRole = String(session.activeRole || (roles.indexOf("HR") >= 0 ? "HR" : roles[0] || "Employee"));
   if (roles.indexOf(activeRole) < 0) activeRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   var classes = SHIFT_APP_CONFIG.CLASSES || ["National", "Expat", "Contract"];
-  var activeClass = String(session.activeClass || "National");
-  if (classes.indexOf(activeClass) < 0) activeClass = "National";
+  var defaultClass = employeeClass_(emp) || "National";
+  var activeClass = String(session.activeClass || defaultClass);
+  if (classes.indexOf(activeClass) < 0) activeClass = defaultClass;
+  if (activeRole === "Employee") activeClass = defaultClass;
   return {
     employee: emp, empId: employeeId_(emp), activeRole: activeRole, activeClass: activeClass,
     mustChangePassword: stored.indexOf("TEMPv1$") === 0,
@@ -293,7 +298,7 @@ function issueSession_(emp, version) {
   var initialRole = roles.indexOf("HR") >= 0 ? "HR" : (roles[0] || "Employee");
   CacheService.getScriptCache().put("SHIFT_SESSION_" + sha256Text_(token), JSON.stringify({
     empId: employeeId_(emp), version: Number(version || 1), activeRole: initialRole,
-    activeClass: "National", issued: new Date().getTime()
+    activeClass: employeeClass_(emp) || "National", issued: new Date().getTime()
   }), SHIFT_SESSION_TTL_SECONDS);
   return token;
 }
