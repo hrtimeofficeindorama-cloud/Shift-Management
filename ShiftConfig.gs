@@ -13,7 +13,8 @@ var SHIFT_APP_CONFIG = {
     OVERRIDES: "Shift_Overrides",
     SWAPS: "Shift_Swap_Requests",
     AUDIT: "Shift_Audit",
-    APPROVAL_LINKS: "Shift_Swap_Approval_Links"
+    APPROVAL_LINKS: "Shift_Swap_Approval_Links",
+    DOWNLINER_REQUESTS: "Shift_Downliner_Requests"
   },
   SHIFT_CODES: {
     G: { label: "General", in: "08:00", out: "17:00" },
