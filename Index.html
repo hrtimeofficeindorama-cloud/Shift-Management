@@ -56,10 +56,15 @@
     .inline-note{font-size:12px;color:var(--muted);line-height:1.7}
     .footer-note{font-size:11px;color:#829ab1;text-align:center;padding-top:24px}
     .password-control{display:flex;gap:7px;align-items:stretch}.password-control input{min-width:0;flex:1}.password-control button{width:auto;margin:0;white-space:nowrap;padding:9px 12px}
-    .role-switch{display:flex;align-items:center;gap:7px}.role-switch label{margin:0;color:#d7e9f3}.role-switch select{width:auto;min-width:125px;padding:8px 10px}
+    .role-switch,.class-switch{display:flex;align-items:center;gap:7px}.role-switch label,.class-switch label{margin:0;color:#d7e9f3}.role-switch select,.class-switch select{width:auto;min-width:125px;padding:8px 10px}
     .employee-search{margin:0 0 7px}.roster-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.roster-controls .field{min-width:145px;margin:0}.roster-controls button{height:39px}
+    .shift-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 13px;padding:11px;background:#f4f8fb;border:1px solid var(--line);border-radius:10px}.shift-toolbar .toolbar-title{font-size:11px;font-weight:800;color:#486581;margin-right:4px}.shift-code-button{padding:7px 11px;min-width:42px}.shift-code-button[data-code="G"]{background:#237a57}.shift-code-button[data-code="O"]{background:#829ab1}.shift-code-button.active{outline:3px solid #e7b75c;outline-offset:1px}.selected-count{font-size:11px;color:var(--muted);margin-left:auto}
+    .roster-table-wrap{width:100%;max-height:64vh;overflow:auto;border:1px solid var(--line);border-radius:9px;position:relative}.roster-table-wrap table{width:max-content;min-width:100%}.roster-table-wrap th.sticky-id,.roster-table-wrap td.sticky-id{position:sticky;left:0;z-index:3;background:#f0f5f9}.roster-table-wrap td.sticky-id{background:#fff}.roster-table-wrap th.sticky-name,.roster-table-wrap td.sticky-name{position:sticky;left:110px;z-index:3;background:#f0f5f9}.roster-table-wrap td.sticky-name{background:#fff}.roster-table-wrap th:first-child,.roster-table-wrap th:nth-child(2){z-index:5}.roster-cell{width:48px;min-width:48px;height:35px;text-align:center;text-transform:uppercase;font-weight:800;padding:5px 4px;border-radius:4px;border-color:transparent;background:#fff}.roster-cell:not(:disabled){cursor:cell}.roster-cell:disabled{opacity:1;color:var(--ink);background:transparent}.roster-cell:focus{border-color:var(--teal);box-shadow:inset 0 0 0 2px var(--teal)}.roster-cell.shift-A,.roster-cell.shift-B,.roster-cell.shift-D,.roster-cell.shift-N{background:#e7f3fb;color:#175b7b}.roster-cell.shift-G{background:#e5f5ed;color:#237a57}.roster-cell.shift-O{background:#f1f5f9;color:#627d98}.roster-cell.selected{outline:2px solid #e7b75c;outline-offset:-2px}.roster-horizontal{display:flex;align-items:center;gap:12px;margin-top:10px;color:var(--muted);font-size:11px}.roster-horizontal input{padding:0}.roster-note{font-size:11px;color:var(--muted);margin-top:8px}
+    .downliner-panel{margin-top:16px;border-top:1px solid var(--line);padding-top:15px}.downliner-actions{display:flex;gap:8px;flex-wrap:wrap}.downliner-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:12px}.downliner-row:last-child{border-bottom:0}.downliner-row .details{min-width:0}.downliner-row button{padding:6px 9px;font-size:11px;white-space:nowrap}
+    .guide-section{border:1px solid var(--line);border-radius:10px;padding:17px;margin:12px 0;background:#fff}.guide-section h2{margin-bottom:10px}.guide-section ol,.guide-section ul{padding-left:22px;line-height:1.8}.guide-section li{margin:4px 0}.contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.contact-grid .full{grid-column:1/-1}
     .date-shift-builder{display:grid;grid-template-columns:minmax(140px,1fr) minmax(180px,1fr) auto;gap:9px;align-items:end}.date-shift-builder .field{margin:0}.date-shift-builder button{white-space:nowrap}
-    @media(max-width:720px){.role-switch{width:100%;justify-content:flex-end}.role-switch select{min-width:110px}.date-shift-builder{grid-template-columns:1fr}.roster-controls .field{min-width:calc(50% - 6px)}}
+    @media(max-width:1000px){.profile{flex-wrap:wrap;justify-content:flex-end}.class-switch,.role-switch{gap:5px}.class-switch label,.role-switch label{font-size:10px}}
+    @media(max-width:720px){.role-switch,.class-switch{width:100%;justify-content:flex-end}.role-switch select,.class-switch select{min-width:110px}.date-shift-builder{grid-template-columns:1fr}.roster-controls .field{min-width:calc(50% - 6px)}.contact-grid{grid-template-columns:1fr}.contact-grid .full{grid-column:auto}.roster-table-wrap{max-height:58vh}}
     @media(max-width:1000px){.app-layout{grid-template-columns:190px minmax(0,1fr)}.col-8,.col-7,.col-5,.col-4{grid-column:span 12}.brand-pane{padding:38px 30px}.brand-pane h1{font-size:32px}}
     @media(max-width:720px){.auth-wrap{grid-template-columns:1fr}.brand-pane{display:none}.auth-card-wrap{min-height:100vh}.app-layout{display:block}.sidebar{display:flex;gap:3px;overflow:auto;padding:9px;border-right:0;border-bottom:1px solid var(--line)}.nav-label,.side-bottom{display:none}.nav-btn{min-width:max-content;width:auto;margin:0;padding:10px}.nav-btn span:last-child{display:inline}.main{padding:20px 13px 38px}.topbar{padding:12px 14px}.profile-name{max-width:135px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.profile-role{display:none}.metrics{grid-template-columns:1fr}.page-head{display:block}.date-chip{display:inline-block;margin-top:12px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.card{padding:15px}}
   </style>
@@ -110,7 +115,8 @@
       <div class="profile">
         <div class="avatar" id="avatar">E</div>
         <div><div class="profile-name" id="profileName">Employee</div><div class="profile-role" id="profileRole">Employee</div></div>
-        <div id="activeRoleWrap" class="role-switch hidden"><label for="activeRoleSelect">Use role</label><select id="activeRoleSelect" aria-label="Active role"></select></div>
+        <div id="activeClassWrap" class="class-switch"><label for="activeClassSelect">Class</label><select id="activeClassSelect" aria-label="Employee class filter"></select></div>
+        <div id="activeRoleWrap" class="role-switch hidden"><label for="activeRoleSelect">Role</label><select id="activeRoleSelect" aria-label="Active role"></select></div>
         <button class="secondary" id="logoutButton">Sign out</button>
       </div>
     </header>
@@ -123,6 +129,7 @@
         <button class="nav-btn hidden" data-page="admin" id="navAdmin"><span class="nav-icon">⚙</span><span>HR administration</span></button>
         <button class="nav-btn" data-page="security"><span class="nav-icon">♙</span><span>Account security</span></button>
         <button class="nav-btn hidden" data-page="audit" id="navAudit"><span class="nav-icon">≡</span><span>Audit history</span></button>
+        <button class="nav-btn" data-page="guide" id="navGuide"><span class="nav-icon">?</span><span>Platform guide</span></button>
         <div class="side-bottom">SHIFT CODES AND TIMES<br>G · General — 08:00–17:00 WAT<br>A · Shift A — 08:00–20:00 WAT<br>B · Shift B — 20:00–08:00 WAT (next day)<br>D · Day Shift — 07:00–19:00 WAT<br>N · Night Shift — 19:00–07:00 WAT (next day)<br>O · Off Day — No shift</div>
       </aside>
       <main class="main">
@@ -141,9 +148,23 @@
               <div class="metric"><div class="metric-label">OPEN SWAP REQUESTS</div><div class="metric-value" id="metricSwaps">—</div><div class="metric-note">Requests requiring an action or decision</div></div>
             </div>
             <div class="card">
-              <div class="card-head"><div><h2>Shift roster</h2><p>Your roster and the employees visible under your selected role.</p></div><button class="secondary" id="refreshButton">Refresh</button></div>
+              <div class="card-head"><div><h2>Shift roster</h2><p>Spreadsheet-style roster for the selected class and date range. Select cells, type a code, paste ranges or drag across cells.</p></div><button class="secondary" id="refreshButton">Refresh</button></div>
               <div class="roster-controls" style="margin-bottom:14px"><div class="field"><label for="rosterStartDate">Start date</label><input type="date" id="rosterStartDate" required></div><div class="field"><label for="rosterEndDate">End date</label><input type="date" id="rosterEndDate" required></div><button type="button" id="applyRosterRangeButton">Apply date range</button></div>
+              <div class="shift-toolbar" id="rosterShiftToolbar"><span class="toolbar-title">SET SELECTED CELL(S)</span><span class="small muted">Loading shift codes…</span></div>
               <div id="rosterTable"><div class="loading">Loading roster…</div></div>
+              <div class="roster-horizontal"><span>Scroll dates</span><input id="rosterHorizontalSlider" type="range" min="0" max="0" step="1" value="0" aria-label="Scroll roster horizontally"><span id="rosterScrollLabel">Start</span></div>
+              <div class="roster-note">Valid codes: G, A, B, D, N and O. Individual employees can edit their own cells; SICs, Managers and HR can edit the employees assigned under them (or the full selected class for HR). Past-date edits are reserved for HR. Use the slider to move horizontally across the dates.</div>
+              <div class="downliner-panel hidden" id="downlinerManager">
+                <div class="card-head"><div><h2>Manage downliners</h2><p>Search employees in the selected class. New relationships require HR approval; removals take effect immediately.</p></div><button class="secondary" type="button" id="closeDownlinerManager">Close</button></div>
+                <form id="downlinerRequestForm">
+                  <div class="field"><label for="downlinerEmployeeSearch">Search employee name or ID</label><input id="downlinerEmployeeSearch" type="search" placeholder="Filter selected-class employees"></div>
+                  <div class="field"><label for="downlinerEmployee">Employee</label><select id="downlinerEmployee" required></select></div>
+                  <div class="field"><label for="downlinerComment">Reason (optional)</label><input id="downlinerComment" maxlength="400" placeholder="Reason for this additional reporting relationship"></div>
+                  <div class="actions"><button type="submit" id="submitDownlinerRequest">Submit to HR for approval</button></div>
+                </form>
+                <div class="rule"></div><h3>Employees currently assigned under you</h3><div id="currentDownliners"><div class="loading">Loading assigned employees…</div></div>
+              </div>
+              <div class="actions"><button id="manageDownlinersButton" class="secondary hidden" type="button">Add / remove downliners</button></div>
             </div>
             <div class="footer-note">Roster patterns repeat until changed. One-day changes and approved swaps do not alter the recurring pattern.</div>
           </section>
@@ -162,20 +183,9 @@
                 </form>
               </div>
               <div class="card col-6">
-                <div class="card-head"><div><h2>Change a shift</h2><p>Effective today or later. Past dates are blocked.</p></div><span class="pill">SIC / HR</span></div>
-                <form id="changeForm">
-                  <div class="field"><label for="changeEmployees">Employees</label><input class="employee-search" type="search" data-filter-target="changeEmployees" placeholder="Type employee name or ID to filter"><select id="changeEmployees" multiple size="5" required></select></div>
-                  <div class="field"><label for="changeMode">Change type</label><select id="changeMode"><option value="pattern">Change recurring pattern</option><option value="dates">Change selected date(s)</option></select></div>
-                  <div id="patternChangeFields">
-                    <div class="field"><label for="changePattern">New shift pattern</label><select id="changePattern"></select></div>
-                    <div class="field"><label for="changeEffective">Effective date</label><input type="date" id="changeEffective"></div>
-                  </div>
-                  <div id="dateChangeFields" class="hidden">
-                    <div class="date-shift-builder"><div class="field"><label for="dateEntryDate">Calendar date</label><input type="date" id="dateEntryDate"></div><div class="field"><label for="dateEntryShift">Replacement shift</label><select id="dateEntryShift"></select></div><div class="field"><label>&nbsp;</label><button type="button" id="addDateEntryButton">Add date + shift</button></div></div><div class="field" style="margin-top:12px"><label for="dateEntries">Selected date(s) and replacement shift(s)</label><textarea id="dateEntries" placeholder="Use the calendar and shift selector, then click Add date + shift. One entry is added per line."></textarea><div class="help">Repeat the calendar/shift selection and Add action until all dates are listed. You may edit the list before saving. Date changes do not alter the recurring pattern on other dates.</div></div>
-                  </div>
-                  <div class="field"><label for="changeReason">Reason / comment</label><input id="changeReason" placeholder="Operational exigency"></div>
-                  <div class="actions"><button type="submit">Save shift change</button></div>
-                </form>
+                <div class="card-head"><div><h2>Roster editing</h2><p>Individual dates are changed directly in the My roster grid.</p></div></div>
+                <p class="muted small">Select one or more cells in My roster, then click G, A, B, D, N or O above the table. You can also type valid codes into cells or paste a block of cells from a spreadsheet. HR may correct past dates; SIC and L1 Manager edits are limited to today and future dates.</p>
+                <div class="actions"><button type="button" class="secondary" data-open-page="dashboard">Open My roster</button></div>
               </div>
             </div>
           </section>
@@ -228,7 +238,11 @@
                 <div class="rule"></div><div class="field"><label>Bulk account reset</label><p class="help">Reset every employee account to the standard temporary password. This signs out existing sessions and requires each employee to set a new password and recovery question.</p><button type="button" class="danger" id="resetAllPasswordsButton">Reset all employee passwords</button></div>
               </div>
               <div class="card col-6">
-                <div class="card-head"><div><h2>Export employee shift roster</h2><p>Export all employees and shift codes for a selected date range.</p></div></div>
+                <div class="card-head"><div><h2>Pending downliner requests</h2><p>Approve or reject requests to assign an additional SIC or L1 Manager.</p></div><button class="secondary" type="button" id="refreshDownlinerRequestsButton">Refresh</button></div>
+                <div id="downlinerRequestsList"><div class="loading">Loading pending requests…</div></div>
+              </div>
+              <div class="card col-6">
+                <div class="card-head"><div><h2>Export employee shift roster</h2><p>Export the selected class and date range.</p></div></div>
                 <form id="exportForm">
                   <div class="form-grid"><div class="field"><label for="exportStartDate">Start date</label><input type="date" id="exportStartDate" required></div><div class="field"><label for="exportEndDate">End date</label><input type="date" id="exportEndDate" required></div></div>
                   <div class="help">Unassigned weekdays default to G; unassigned Saturdays and Sundays default to O. Shift Type is S if any A, B, D or N occurs in the selected range; otherwise it is G.</div>
@@ -246,6 +260,23 @@
                 <div id="importResult" class="inline-note" style="margin-top:13px"></div>
                 <div id="importErrors" class="table-wrap hidden" style="margin-top:10px"></div>
               </div>
+            </div>
+          </section>
+
+          <section class="page hidden" id="page-guide">
+            <div class="page-head"><div><h1>Shift Management guide</h1><p>Step-by-step instructions for every role assigned to your account, regardless of the selected active role.</p></div></div>
+            <div id="guideContent"><div class="loading">Preparing your role-specific guide…</div></div>
+            <div class="card" style="margin-top:16px">
+              <div class="card-head"><div><h2>Contact the developer / support team</h2><p>Send a suggestion, query or issue report. The form is delivered to HR Time Office with a copy to the designated contact.</p></div></div>
+              <form id="developerContactForm">
+                <div class="contact-grid">
+                  <div><label for="contactCategory">Type</label><select id="contactCategory"><option>Suggestion</option><option>Query</option><option>Technical issue</option><option>Access or roster issue</option><option>Other</option></select></div>
+                  <div><label for="contactSubject">Subject</label><input id="contactSubject" required maxlength="140" placeholder="Brief description"></div>
+                  <div class="full"><label for="contactMessage">Details</label><textarea id="contactMessage" required minlength="10" maxlength="5000" placeholder="Describe the issue, what you expected, and any relevant employee/date references. Do not include passwords."></textarea></div>
+                </div>
+                <div class="actions"><button type="submit" id="sendContactButton">Send to support</button></div>
+                <p class="help">To: hrtimeoffice@ng.indorama.com · CC: Olusegun.kehinde@indorama.com</p>
+              </form>
             </div>
           </section>
 
