@@ -4,7 +4,9 @@
  */
 var SHIFT_APP_CONFIG = {
   SPREADSHEET_ID: "1Mzh0H6PQTq6w47fIlMJ6qUL9UT3NvpBvuoBRN_DrSA8",
+  AUDIT_SPREADSHEET_ID: "1X3FzlezQSJqA3a3f8Xj0Oq3bTsy0_BLbQXDE9xFclNU",
   EMPLOYEE_SHEET: "Emp_List",
+  CLASSES: ["National", "Expat", "Contract"],
   TIME_ZONE: "Africa/Lagos",
   TABLES: {
     ASSIGNMENTS: "Shift_Assignments",
