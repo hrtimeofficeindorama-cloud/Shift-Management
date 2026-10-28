@@ -535,3 +535,34 @@ function getSwapApprovers_(employeeA, employeeB, kind) {
   });
   return refs;
 }
+
+/** One-time, non-destructive migration of existing audit rows to the dedicated workbook. */
+function migrateLegacyAuditRows_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty("SHIFT_AUDIT_MIGRATION_DONE") === "true") return 0;
+  var sourceSpreadsheet = SpreadsheetApp.openById(SHIFT_APP_CONFIG.SPREADSHEET_ID);
+  var sourceSheet = sourceSpreadsheet.getSheetByName(SHIFT_APP_CONFIG.TABLES.AUDIT);
+  if (!sourceSheet || sourceSheet.getLastRow() < 2) {
+    props.setProperty("SHIFT_AUDIT_MIGRATION_DONE", "true");
+    return 0;
+  }
+  var existingIds = {};
+  getTableRows_(SHIFT_APP_CONFIG.TABLES.AUDIT).forEach(function(row) {
+    existingIds[String(row["Audit ID"] || "")] = true;
+  });
+  var values = sourceSheet.getRange(1, 1, sourceSheet.getLastRow(), sourceSheet.getLastColumn()).getValues();
+  var headers = values[0].map(function(header) { return String(header || "").trim(); });
+  var migrated = [];
+  for (var i = 1; i < values.length; i++) {
+    if (values[i].every(function(value) { return value === "" || value === null; })) continue;
+    var obj = {};
+    headers.forEach(function(header, idx) { obj[header] = values[i][idx]; });
+    var id = String(obj["Audit ID"] || "");
+    if (id && existingIds[id]) continue;
+    if (id) existingIds[id] = true;
+    migrated.push(obj);
+  }
+  appendObjects_(SHIFT_APP_CONFIG.TABLES.AUDIT, migrated);
+  props.setProperty("SHIFT_AUDIT_MIGRATION_DONE", "true");
+  return migrated.length;
+}
