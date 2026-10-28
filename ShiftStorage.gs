@@ -61,7 +61,10 @@ function ensureEmployeeColumns_(sheet) {
 }
 
 function ensureTableSheet_(ss, name, requiredHeaders) {
-  var sheet = ss.getSheetByName(name);
+  var sheet = name === SHIFT_APP_CONFIG.TABLES.AUDIT && SHIFT_APP_CONFIG.AUDIT_SHEET_ID
+    ? ss.getSheetById(Number(SHIFT_APP_CONFIG.AUDIT_SHEET_ID))
+    : null;
+  if (!sheet) sheet = ss.getSheetByName(name);
   if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
@@ -90,7 +93,11 @@ function getSpreadsheetForTable_(name) {
 }
 
 function tableSheet_(name) {
-  var sheet = getSpreadsheetForTable_(name).getSheetByName(name);
+  var ss = getSpreadsheetForTable_(name);
+  var sheet = name === SHIFT_APP_CONFIG.TABLES.AUDIT && SHIFT_APP_CONFIG.AUDIT_SHEET_ID
+    ? ss.getSheetById(Number(SHIFT_APP_CONFIG.AUDIT_SHEET_ID))
+    : null;
+  if (!sheet) sheet = ss.getSheetByName(name);
   if (!sheet) throw new Error("Missing data sheet '" + name + "'. Run setupShiftManagement() first.");
   return sheet;
 }
