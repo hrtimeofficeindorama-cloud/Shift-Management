@@ -863,21 +863,173 @@
     var wrap=$("guideContent");
     if(!wrap||!initData)return;
     var roles=initData.roles||["Employee"];
-    var common='<section class="guide-section"><h2>Getting started and account security</h2><ol>'+
-      '<li>Sign in with your employee ID or registered email and your password.</li>'+
-      '<li>If the app requests first-time setup, create a new password, confirm it, and set your recovery question and answer.</li>'+
-      '<li>HR, SIC and L1 Managers can change the <strong>Class</strong> selector (National, Expat or Contract) to work within a different class. Employee-only accounts are locked to their own class. When assigned multiple roles, use the <strong>Role</strong> selector beside it. Class and role filters apply to roster, scheduling, swaps and relevant administration lists.</li>'+
-      '<li>Use <strong>Account security</strong> to change your password or update your recovery question. Never share your password or approval links.</li>'+
-      '<li>Use <strong>Platform guide</strong> to read instructions for every role assigned to your account, even when another role is currently selected.</li>'+
-      '</ol></section>';
+    function task(role,title,steps){
+      return '<section class="guide-section"><h3>'+esc(role+" — "+title)+'</h3><ol>'+
+        steps.map(function(step){return '<li>'+step+'</li>';}).join("")+
+        '</ol></section>';
+    }
+    var common=[
+      task("All users","1. Sign in and secure your account",[
+        'Open the Shift Management web app and sign in with your employee ID or registered email and password.',
+        'At first sign-in, follow the prompts to set a personal password, confirm it, and configure your recovery question and answer.',
+        'If you forget your password, choose the recovery option on the sign-in screen and follow the security-question steps. Contact HR if you cannot recover the account.',
+        'Never share your password, recovery answer, or an email approval link with another person.'
+      ]),
+      task("All users","2. Choose the class and role",[
+        'The Class selector filters the employees and transactions shown in the workspace. Available classes are National, Expat and Contract.',
+        'HR, SIC and L1 Manager users can select the class they are authorised to manage. An Employee-only account remains restricted to the class assigned to that employee record.',
+        'If your account has more than one role, use the Role selector beside Class to choose Employee, SIC, L1 Manager or HR. The active role controls which actions are available.',
+        'Open Platform guide at any time to see instructions for every role assigned to your account, even when a different role is currently selected.'
+      ]),
+      task("All users","3. Understand dates and shift codes",[
+        'Use the Start date and End date fields above My roster to choose the period. The default period is the first through last date of the current month.',
+        'Dates displayed in the roster and task messages use DD/MMM/YYYY. The day headings show the weekday on the first header line and the day number directly below it.',
+        'G means General, A means Shift A, B means Shift B, D means Day Shift, N means Night Shift, and O means Off Day. Refer to the Shift Codes key for the timing description of each code.',
+        'Use the roster table horizontal scrollbar to view dates that extend beyond the visible screen width.'
+      ]),
+      task("All users","4. Contact support",[
+        'Open Platform guide and scroll to Contact the developer / support team.',
+        'Choose the type of enquiry, provide a short subject, and describe the issue or suggestion with enough detail for HR to understand it.',
+        'Do not include passwords, recovery answers or other confidential credentials. The message is emailed to hrtimeoffice@ng.indorama.com with a copy to Olusegun.kehinde@indorama.com.'
+      ])
+    ];
     var guides={
-      "Employee":'<section class="guide-section"><h2>Employee guide</h2><ol><li>Open <strong>My roster</strong>. The default date range is the first through last day of the current month.</li><li>Choose any start and end date and select <strong>Apply date range</strong>. Scroll horizontally using the scrollbar at the bottom edge of the roster table.</li><li>Your Emp ID appears before your name. Dates use DD/MMM/YYYY. Shift codes are G (General), A (Shift A), B (Shift B), D (Day Shift), N (Night Shift) and O (Off Day), with timings shown in the Shift Code key.</li><li>Employees using the Employee role cannot change shift cells directly. If you need a shift change, contact your SIC, L1 Manager or HR. If you also have SIC, L1 Manager or HR assigned to your account, switch to that role to edit shifts within its permissions. You can still request a shift swap with an eligible colleague in the same class.</li><li>To exchange a shift with an eligible colleague, open <strong>Shift swaps</strong>, choose a colleague in the same class, select the date and submit the request. The other employee must accept, then all required SIC and L1 Manager approvals must be complete before shifts are exchanged.</li><li>Use <strong>Requests &amp; approvals</strong> to review the progress of your swap requests. You may also decide a swap from the action links in the email you receive.</li><li>Use <strong>Platform guide → Contact the developer / support team</strong> for suggestions, queries or issues.</li></ol></section>',
-      "SIC":'<section class="guide-section"><h2>SIC — Shift In-Charge guide</h2><ol><li>Set the Class selector to the employee class you need to manage. Only National, Expat or Contract employees in that class are listed.</li><li>In <strong>My roster</strong>, view employees assigned to you as SIC. Use the date range and the table&#39;s horizontal scrollbar for the desired period.</li><li>To change individual shifts, switch to the SIC role, select a cell, type a valid shift code, paste a range from a spreadsheet, drag across cells to select a range, then click G, A, B, D, N or O above the table to apply a code to the selected cells. You may edit your own shift while using the SIC role and employees under your SIC assignment for today/future dates; HR handles past-date corrections.</li><li>To schedule a recurring pattern, open <strong>Schedule &amp; change</strong>, search employees by ID or name, select one or more, choose a pattern and set an effective start date in the future.</li><li>To add an employee missing from your list, choose <strong>Add / remove downliners</strong>, search within the selected class and submit an assignment request. The employee becomes your downliner only after HR approves.</li><li>Remove a currently assigned employee through the same downliner panel. Removal affects only your SIC relationship; any other SIC relationship remains.</li><li>For swaps, the selected employee class must match both employees. Accept/reject or approve/reject using the email links or the Shift swaps screen; the roster updates only after every required approval.</li></ol></section>',
-      "L1 Manager":'<section class="guide-section"><h2>L1 Manager guide</h2><ol><li>Select the employee Class that you need to view, and open <strong>My roster</strong> to see direct employees listed under your L1 Manager relationship.</li><li>Use the date range and the table&#39;s horizontal scrollbar to view date columns. Emp ID is first, followed by Emp Name; visible dates use DD/MMM/YYYY.</li><li>While using the L1 Manager role, change individual shift cells by typing G, A, B, D, N or O, pasting a valid grid range, or selecting multiple cells and clicking a shift code above the grid. You can edit your own shift in this role and employees assigned under your manager relationship, but cannot change past dates.</li><li>Use <strong>Schedule &amp; change</strong> to assign a recurring shift pattern to your downliners, using the employee name/ID search. New recurring patterns must start in the future.</li><li>If a required employee is missing, submit an additional L1 Manager relationship request from <strong>Add / remove downliners</strong>. HR must approve the request before it is added.</li><li>Review swap requests and approve/reject management approvals only when assigned as approver. Swaps cannot cross National, Expat and Contract classes.</li></ol></section>',
-      "HR":'<section class="guide-section"><h2>HR / Super Admin guide</h2><ol><li>Select National, Expat or Contract in the Class selector before managing that class. Class filtering is enforced by server-side checks for shift operations.</li><li>To schedule recurring patterns, open <strong>Schedule &amp; change</strong>, filter employees by name or ID, select the group, choose the shift pattern and set the future effective date.</li><li>To correct a particular date, edit it directly in My roster or paste a validated range of cells. HR can make past, current and future date corrections.</li><li>Review <strong>HR administration → Pending downliner requests</strong>. Approving appends the requester to the employee&#39;s SIC or L1 Manager field without removing current relationships; rejecting records the decision and comment. Check the selected class before processing requests.</li><li>Use HR administration to assign roles, reset individual passwords, reset all employee accounts, import CSV shift overrides, and export the selected class roster for a date range.</li><li>Export columns begin with Emp ID and Shift Type, then a column for each date. Missing shifts default to G on weekdays and O on weekends. Shift Type is S if any A, B, D or N occurs in the range; otherwise it is G.</li><li>Open <strong>Audit history</strong> to review changes. New audit records are stored in the separately configured audit spreadsheet; the setup function migrates legacy records without deleting the originals.</li><li>Use email action links to approve swaps without logging in, but confirm the decision on the opened page. Links are single-use and expire after 72 hours.</li></ol></section>'
+      "Employee":[
+        task("Employee","1. View your roster",[
+          'Select My roster from the workspace menu.',
+          'Check the Class selector. Employee-only access is locked to your own class.',
+          'Set Start date and End date to the period you need and click Apply date range.',
+          'Read each row from Emp ID and Emp Name across the date columns. The day-number header is directly below the weekday header.'
+        ]),
+        task("Employee","2. Request a shift swap",[
+          'Open Shift swaps in the workspace menu.',
+          'Choose a colleague from the checkbox list. The eligible-colleague list is limited to the same employee class and the permitted swap group.',
+          'Choose the shift date and enter any helpful comment before submitting the request.',
+          'The selected colleague receives the request and can Accept or Decline it. If accepted, the request moves to the required SIC and L1 Manager approval stages.',
+          'The roster changes only after the colleague has accepted and every required approver has approved. You can review status, comments and approval progress in the swap list.'
+        ]),
+        task("Employee","3. Request a direct shift change",[
+          'The Employee role is read-only for shift cells. Do not use a roster cell to attempt a direct shift change.',
+          'Contact your SIC, L1 Manager or HR and provide the date, current shift, requested shift and reason.',
+          'If you also hold SIC, L1 Manager or HR as an assigned role, switch to that role before editing your own shift; use only the permissions of that active role.'
+        ]),
+        task("Employee","4. Follow a swap by email",[
+          'Open the shift-swap notification and check the names, date and shift details.',
+          'Use the action link only if you are the intended recipient. The link opens a confirmation page; the decision is recorded only after you confirm on that page.',
+          'Links expire after 72 hours and are single-use. If a link is expired or already used, return to the app or contact the requester for help.'
+        ])
+      ],
+      "SIC":[
+        task("SIC","1. View your team roster",[
+          'Switch the Role selector to SIC and select the appropriate employee class.',
+          'Open My roster. Only employees assigned under your SIC relationship and belonging to the selected class are listed.',
+          'Set the start and end dates and click Apply date range. Use the roster table&#39;s native horizontal scrollbar for dates outside the visible area.'
+        ]),
+        task("SIC","2. Change a shift cell",[
+          'Confirm that SIC is the active role. Locate the employee row and date column that need correction.',
+          'Select a cell and type one of G, A, B, D, N or O, then move away from the cell to save it. Alternatively, paste a valid block of shift codes into the grid.',
+          'To apply one code to multiple selected cells, select the target cells by dragging or using Shift-selection, then click the corresponding code above the table.',
+          'SIC can edit assigned employees for today and future dates. Past-date corrections must be performed by HR.'
+        ]),
+        task("SIC","3. Schedule a recurring shift pattern",[
+          'Open Schedule &amp; change from the workspace menu.',
+          'Search for an employee by name or ID, then tick the checkbox beside each employee to include. Several employees may be selected for one schedule operation.',
+          'Choose the recurring pattern, enter the effective start date, and review the selection before submitting.',
+          'New recurring patterns must start in the future. Review My roster afterwards to confirm that the expected dates show the assigned pattern.'
+        ]),
+        task("SIC","4. Add or remove an employee from your team",[
+          'In My roster, open Add / remove downliners.',
+          'Search for the employee in the selected class and tick the employee checkbox.',
+          'Submit the request with a reason if useful. The employee is not added until HR approves the relationship request.',
+          'To remove an existing downliner, use Remove from my list and confirm. This removes only your SIC relationship; it does not remove other assigned SICs.'
+        ]),
+        task("SIC","5. Review shift swaps",[
+          'Open Shift swaps and review requests assigned to you as an SIC approver.',
+          'Check the employees, shift date and original shifts before choosing Approve or Reject.',
+          'You may also use the action link in the notification email. Confirm the decision on the page that opens.',
+          'Swaps can only occur within the same class. A swap is applied only after the colleague and all required SIC and L1 Manager approvals are complete.'
+        ])
+      ],
+      "L1 Manager":[
+        task("L1 Manager","1. View your team roster",[
+          'Switch the Role selector to L1 Manager and select the employee class you need to manage.',
+          'Open My roster to see employees assigned to your L1 Manager relationship in that class.',
+          'Choose a start/end date range and click Apply date range. Use the table&#39;s horizontal scrollbar to navigate to later or earlier date columns.'
+        ]),
+        task("L1 Manager","2. Change a shift cell",[
+          'Confirm that L1 Manager is the active role and locate the correct employee and date.',
+          'Type a valid code (G, A, B, D, N or O) in the cell, paste a valid rectangular block, or select several cells and click a code above the grid.',
+          'You may edit your own shift while using the L1 Manager role, and you may edit employees assigned under your management relationship.',
+          'L1 Managers cannot change past dates. Ask HR to correct a historical roster entry.'
+        ]),
+        task("L1 Manager","3. Schedule a recurring pattern",[
+          'Open Schedule &amp; change and search for employees by name or ID.',
+          'Tick the checkbox beside each employee whose recurring roster you want to schedule.',
+          'Select the pattern and enter its future effective date. Submit and then inspect My roster to verify the displayed dates and codes.'
+        ]),
+        task("L1 Manager","4. Add or remove a reporting relationship",[
+          'Open Add / remove downliners from My roster.',
+          'Search for an employee in the selected class and select the checkbox beside that employee.',
+          'Submit the additional L1 Manager assignment request. HR must approve it before the employee appears under your reporting relationship.',
+          'Use Remove from my list to remove only your own manager relationship. Any other manager or SIC assignment remains intact.'
+        ]),
+        task("L1 Manager","5. Process swap approvals",[
+          'Open Shift swaps and locate requests awaiting your approval as L1 Manager.',
+          'Review the date, employee identities and original shift codes before deciding.',
+          'Approve or Reject in the workspace or use the secure email action link. Opening the link alone does not record a decision.',
+          'The swap is applied only after every required approval is complete, and employees from different classes cannot swap.'
+        ])
+      ],
+      "HR":[
+        task("HR","1. Select the correct employee class",[
+          'Switch the active Role to HR and choose National, Expat or Contract in the Class selector.',
+          'Confirm the selected class before assigning roles, managing reporting relationships, resetting an account, importing shifts or exporting roster data.',
+          'The class check is enforced by the server as well as the interface.'
+        ]),
+        task("HR","2. Assign SIC and L1 Manager",[
+          'Open HR administration and find Assign SIC and L1 Manager.',
+          'Search for the employee whose reporting relationships you want to set and select that employee.',
+          'Search the SIC list and tick every applicable SIC checkbox. Then search the L1 Manager list and tick the appropriate manager checkboxes.',
+          'Click Save reporting assignments. The selected employee&#39;s relationship fields are updated to the choices submitted.',
+          'Every employee assigned as an SIC automatically receives the SIC role. Existing roles are preserved; review role assignments if an employee no longer needs SIC access.'
+        ]),
+        task("HR","3. Approve extra downliner requests",[
+          'Open the Pending downliner requests area in HR administration and select the class that matches the request.',
+          'Review who requested the relationship, the employee, the relationship type and any reason supplied.',
+          'Choose Approve assignment or Reject. Add a comment when the decision needs explanation.',
+          'An approved request appends the new SIC or L1 Manager to existing relationships instead of overwriting other assigned people.'
+        ]),
+        task("HR","4. Correct or schedule shifts",[
+          'Use Schedule &amp; change to assign a recurring pattern. Search employees by name or ID, tick the employee checkboxes, select a pattern and set its effective date.',
+          'For a particular date, use My roster and enter the replacement code directly into the appropriate cell, or paste a valid range. Valid codes are G, A, B, D, N and O.',
+          'HR can correct past, present and future dates. Review the roster after saving to confirm the result.'
+        ]),
+        task("HR","5. Manage accounts and roles",[
+          'In HR administration, select an employee using the checkbox list after searching by name or ID.',
+          'Use role assignment to add or remove the roles that employee is permitted to hold.',
+          'Use Reset employee password to reset one account. The employee must choose a new password and set a recovery question at the next sign-in.',
+          'The bulk password reset affects all employee accounts and must be used only when intended. It invalidates existing sessions and requires employees to set up their accounts again.'
+        ]),
+        task("HR","6. Import and export shifts",[
+          'For CSV import, prepare the required employee ID, date and shift-code columns and submit the file through Bulk shift import. Review rejected rows and correct the reported issues before retrying.',
+          'For export, choose the start date and end date and generate the CSV for the selected class.',
+          'The export begins with Emp ID and Shift Type, followed by one column per date. Unassigned weekdays default to G; Saturdays and Sundays default to O. Shift Type is S if any A, B, D or N occurs in the range; otherwise it is G.'
+        ]),
+        task("HR","7. Review audit and email approvals",[
+          'Open Audit history to inspect recorded changes, the actor, affected employees, dates and outcome.',
+          'New audit events are stored in the configured separate audit spreadsheet. The setup migration preserves the original audit history in the main workbook.',
+          'Shift-swap action links can be used without signing in, but the approver must confirm the decision on the confirmation page. Links are single-use and expire after 72 hours.'
+        ])
+      ]
     };
-    var visible=roles.filter(function(role){return !!guides[role];});
-    wrap.innerHTML=common+(visible.length?visible.map(function(role){return guides[role];}).join(""):'<section class="guide-section"><h2>Role guide</h2><p>No detailed guide is configured for the roles currently assigned to your account.</p></section>');
+    var html=common.join("");
+    roles.filter(function(role){return !!guides[role];}).forEach(function(role){
+      html+=guides[role].join("");
+    });
+    if(!roles.some(function(role){return !!guides[role];})){
+      html+='<section class="guide-section"><h2>Role guide</h2><p>No detailed guide is configured for the roles currently assigned to your account.</p></section>';
+    }
+    wrap.innerHTML=html;
   }
   function selectedValues(id){
     return Array.from($(id).selectedOptions).map(function(o){return o.value;}).filter(Boolean);
